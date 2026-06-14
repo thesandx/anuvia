@@ -8,7 +8,7 @@ python-jose[cryptography]==3.3.0
 bcrypt==4.2.1
 python-multipart==0.0.20
 httpx==0.28.1
-libsql-client==0.3.1
+asyncpg==0.30.0
 aiosqlite==0.20.0
 greenlet==3.1.1
 

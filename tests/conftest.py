@@ -1,3 +1,10 @@
+import os
+
+# Force in-memory SQLite for all tests regardless of what .env contains.
+# Must be set before any app module is imported so pydantic-settings picks it up.
+os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+os.environ.setdefault("SECRET_KEY", "test-only-secret-key-not-used-in-production")
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine

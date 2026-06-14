@@ -32,7 +32,7 @@ Every product lives in `app/apps/<name>/`. Adding a new one means creating one f
 | Config | pydantic-settings | 2.6.1 |
 | Auth | python-jose (JWT) + bcrypt | 3.3.0 / 4.2.1 |
 | Local DB | aiosqlite (SQLite) | 0.20.0 |
-| Production DB | Turso (libSQL) | — |
+| Production DB | Neon (PostgreSQL serverless) | — |
 | HTTP client | httpx | 0.28.1 |
 | Linter | Ruff | 0.8.4 |
 | Testing | pytest + pytest-asyncio | 8.3.4 / 0.24.0 |
@@ -172,105 +172,72 @@ Tests use an in-memory SQLite database — `.env` is not required to run them.
 
 ---
 
-## Setting Up Turso (Production Database)
+## Setting Up Neon (Production Database)
 
-Turso is a globally distributed SQLite database. It uses the same SQL dialect as the local SQLite dev database — zero friction, no schema differences between environments. The only thing that changes is `DATABASE_URL`.
+**Why not Turso?** Turso uses a custom `libsql` dialect for SQLAlchemy that is sync-only. This project uses `create_async_engine` throughout, which requires an async-capable database driver. Neon is a free serverless PostgreSQL provider with first-class async SQLAlchemy support via `asyncpg`.
 
-> Full CLI reference: [https://docs.turso.tech/sql-reference/cli/getting-started](https://docs.turso.tech/sql-reference/cli/getting-started)
+> Local development still uses SQLite (`aiosqlite`) — no change there. Only the production `DATABASE_URL` differs.
 
-### 1. Install the Turso CLI
+### 1. Create a free Neon account
 
-**macOS:**
+Go to [https://neon.tech](https://neon.tech) and sign up. It's free, no credit card required.
+
+### 2. Create a project and database
+
+In the Neon dashboard:
+1. Click **New Project**
+2. Give it a name (e.g. `anuvia`)
+3. Choose your region (pick the one closest to your Cloud Run region)
+4. Click **Create Project**
+
+Neon creates a default database called `neondb` automatically.
+
+### 3. Get your connection string
+
+In the project dashboard, click **Connection Details** (or the **Connect** button). Make sure to:
+- Set **Connection type** to `Connection string`
+- Set **Driver** to `SQLAlchemy (asyncpg)`
+
+It outputs a string in this format:
+
+```
+postgresql+asyncpg://user:password@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require
+```
+
+> **Important — Neon may give you a plain `postgresql://` string instead of `postgresql+asyncpg://`.** If the dashboard does not offer an asyncpg-specific option, or gives you a URL starting with `postgresql://`, you must manually adjust it before use:
+>
+> 1. Change `postgresql://` → `postgresql+asyncpg://`
+> 2. Remove the `?sslmode=require` (and any other query params like `channel_binding=require`) — asyncpg does not accept these; SSL is already enforced in `database.py` via `connect_args`.
+>
+> **Before (what Neon gives you):**
+> ```
+> postgresql://user:password@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+> ```
+>
+> **After (what you actually use):**
+> ```
+> postgresql+asyncpg://user:password@ep-xxx.us-east-2.aws.neon.tech/neondb
+> ```
+
+### 4. Save it in your .env
 
 ```bash
-brew install tursodatabase/tap/turso
+DATABASE_URL=postgresql+asyncpg://user:password@ep-xxx.us-east-2.aws.neon.tech/neondb
 ```
 
-**Linux:**
-
-```bash
-curl -sSfL https://get.tur.so/install.sh | bash
-```
-
-**Windows:** Use WSL2 and run the Linux command above.
-
-### 2. Log in
-
-```bash
-turso auth login
-```
-
-Opens a browser to authenticate. Return to the terminal when done.
-
-### 3. Create a database
-
-```bash
-turso db create anuvia
-```
-
-Replace `anuvia` with whatever name you want. Turso automatically picks the nearest region.
-
-### 4. Get the database URL
-
-```bash
-turso db show anuvia
-```
-
-Look for the `URL` field in the output:
-
-```
-Name:    anuvia
-URL:     libsql://anuvia-yourname.turso.io
-```
-
-Copy that URL.
-
-### 5. Create an auth token
-
-```bash
-turso db tokens create anuvia
-```
-
-Outputs a long JWT string. Copy it.
-
-### 6. Assemble your DATABASE_URL
-
-Combine the URL and token into this format:
-
-```
-libsql+https://anuvia-yourname.turso.io?authToken=eyJhbGci...your-token
-```
-
-The pattern is:
-
-```
-libsql+https://<host from step 4, without libsql://>?authToken=<token from step 5>
-```
-
-### 7. Save it in your .env
-
-```bash
-DATABASE_URL=libsql+https://anuvia-yourname.turso.io?authToken=eyJhbGci...
-```
-
-### 8. Run migrations against Turso
+### 5. Run migrations against Neon
 
 ```bash
 alembic upgrade head
 ```
 
-Alembic connects to Turso directly and creates all tables. Verify with:
-
-```bash
-turso db shell anuvia ".tables"
-# users  subscriptions  chat_sessions  chat_messages  alembic_version
-```
+Alembic connects to Neon and creates all tables. The SSL connection is handled automatically — `database.py` detects the `postgresql` prefix and adds `ssl=require` to the connection args.
 
 ### Where to put the DATABASE_URL
 
 | Environment | Where to set it |
 |---|---|
-| Local dev | `.env` file (already git-ignored) |
+| Local dev | `.env` file (already git-ignored) — use the SQLite default |
 | GitHub CI | Not needed — CI uses in-memory SQLite |
 | Production | GitHub Secret named `DATABASE_URL` → injected into Cloud Run at deploy |
 
@@ -298,8 +265,8 @@ All variables are read from the environment by `app/core/config.py` using Pydant
 # Local development (SQLite, no setup needed)
 DATABASE_URL=sqlite+aiosqlite:///./local.db
 
-# Production (Turso — globally distributed SQLite)
-DATABASE_URL=libsql+https://your-db.turso.io?authToken=your-auth-token
+# Production (Neon — serverless PostgreSQL, see "Setting Up Neon" section for how to build this string)
+DATABASE_URL=postgresql+asyncpg://user:password@ep-xxx.us-east-2.aws.neon.tech/neondb
 ```
 
 ---
@@ -340,7 +307,7 @@ Click **Secrets** → **New repository secret**:
 |---|---|
 | `GCP_SA_KEY` | Service account JSON key for GCP deployment (see below) |
 | `SECRET_KEY` | JWT signing secret — run `python -c "import secrets; print(secrets.token_hex(32))"` |
-| `DATABASE_URL` | Your production Turso connection string, including auth token |
+| `DATABASE_URL` | Your Neon connection string (copy from Neon dashboard → Connect → SQLAlchemy asyncpg) |
 | `STRIPE_SECRET_KEY` | Your Stripe secret key (optional — leave empty if not using payments) |
 | `STRIPE_WEBHOOK_SECRET` | Your Stripe webhook secret (optional) |
 
@@ -418,14 +385,14 @@ gcloud run deploy anuvia \
   --set-env-vars "APP_ENV=production" \
   --set-env-vars "APP_NAME=anuvia" \
   --set-env-vars "SECRET_KEY=your-secret-key" \
-  --set-env-vars "DATABASE_URL=libsql+https://your-db.turso.io?authToken=your-token"
+  --set-env-vars "DATABASE_URL=postgresql+asyncpg://user:password@ep-xxx.neon.tech/neondb"
 ```
 
 ### Production checklist
 
 - [ ] `APP_ENV=production` — disables `/docs` and `/redoc`
 - [ ] `SECRET_KEY` is at least 32 random characters
-- [ ] `DATABASE_URL` points to Turso (not local SQLite)
+- [ ] `DATABASE_URL` points to Neon PostgreSQL (not local SQLite)
 - [ ] `GCP_SA_KEY` local file deleted after saving to GitHub Secrets
 - [ ] CORS origins restricted to your actual frontend domain (in `app/main.py`)
 - [ ] Cloud Run min-instances set to 1 if cold starts are unacceptable
