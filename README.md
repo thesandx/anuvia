@@ -361,6 +361,73 @@ Push to `main`. The deploy workflow runs automatically. After the first deploy s
 
 ---
 
+## Branch Protection & PR Workflow
+
+### Why branch protection?
+
+Prevents accidental direct pushes to `main`. Every change must go through a PR, which means CI runs first and the deploy only happens after a deliberate merge.
+
+### Enable branch protection on GitHub
+
+Go to your repo → **Settings** → **Branches** → **Add branch protection rule**.
+
+Set **Branch name pattern** to `main`, then enable:
+
+| Setting | Value | Why |
+|---|---|---|
+| Require a pull request before merging | ✅ | No direct pushes to main |
+| Required approving reviews | `0` | Solo founder — no second reviewer needed, PR is still required |
+| Require status checks to pass before merging | ✅ | CI must be green before merge |
+| Status check to require | `Lint & Test` | The job name in `ci.yml` |
+| Require branches to be up to date | ✅ | Branch must be current with main before merging |
+| Do not allow bypassing the above settings | ❌ (off) | Lets you override as admin if you're ever stuck |
+
+Or via GitHub CLI:
+
+```bash
+gh api repos/{owner}/{repo}/branches/main/protection \
+  --method PUT \
+  --field 'required_status_checks={"strict":true,"contexts":["Lint & Test"]}' \
+  --field 'enforce_admins=false' \
+  --field 'required_pull_request_reviews={"required_approving_review_count":0}' \
+  --field 'restrictions=null'
+```
+
+Replace `{owner}` and `{repo}` with your GitHub username and repository name.
+
+### Full development workflow
+
+Once branch protection is on, every change follows this cycle:
+
+```bash
+# 1. Create a feature branch
+git checkout -b feat/my-change
+
+# 2. Make your changes
+
+# 3. Test locally with Docker against Neon
+docker build -t anuvia . && docker run --env-file .env.docker -p 8080:8080 anuvia
+# → http://localhost:8080/docs
+
+# 4. Push the branch
+git push -u origin feat/my-change
+
+# 5. Open a PR (GitHub UI or CLI)
+gh pr create --title "feat: my change" --body "What and why"
+
+# 6. CI runs automatically — Ruff + pytest must pass (green checkmark)
+
+# 7. Merge the PR
+gh pr merge --squash   # or merge via GitHub UI
+
+# 8. deploy.yml triggers automatically on the push-to-main from the merge
+#    → Docker image built, pushed to GCR, deployed to Cloud Run
+```
+
+The deploy only happens when the PR is merged — never on feature branches.
+
+---
+
 ## Local Docker Testing (Production-like)
 
 Run the exact same Docker image locally but pointed at Neon — no SQLite, no dev shortcuts. This is the fastest way to catch environment issues before pushing to Cloud Run.
@@ -377,13 +444,15 @@ Open `.env.docker` and set real values:
 
 ```bash
 APP_NAME=anuvia
-APP_ENV=production
-DEBUG=false
+APP_ENV=development   # keeps /docs enabled for local debugging
+DEBUG=true            # prints every SQL query to the terminal
 SECRET_KEY=<generate with: python -c "import secrets; print(secrets.token_hex(32))">
 DATABASE_URL=postgresql+asyncpg://user:password@ep-xxx.us-east-2.aws.neon.tech/neondb
 ```
 
 > `.env.docker` is git-ignored. Never commit it. It contains real credentials.
+
+`APP_ENV=development` enables `/docs` and `/redoc` so you can explore the API in the browser. `DEBUG=true` enables SQLAlchemy's echo mode — every SQL query is printed to stdout as it runs.
 
 ### 3. Build the image
 
@@ -397,17 +466,27 @@ docker build -t anuvia .
 docker run --env-file .env.docker -p 8080:8080 anuvia
 ```
 
-This runs migrations against Neon first, then starts the server — identical to what Cloud Run does.
+This runs migrations against Neon first, then starts the server — identical to what Cloud Run does. Logs stream directly to your terminal.
 
 ### 5. Test it
 
 ```
 http://localhost:8080/health     → {"status": "ok", "app": "anuvia"}
+http://localhost:8080/docs       → Swagger UI (enabled because APP_ENV=development)
 http://localhost:8080/auth/register
 http://localhost:8080/auth/login
 ```
 
-> `/docs` will be `404` because `APP_ENV=production` disables it. Change to `APP_ENV=development` in `.env.docker` if you want the Swagger UI locally.
+### What you'll see in the terminal logs
+
+```
+INFO     Running migrations...
+INFO     Application startup complete.
+INFO     2024-01-01 12:00:00 - SELECT users.id ... (SQL echo from DEBUG=true)
+INFO     127.0.0.1:12345 - "POST /auth/login HTTP/1.1" 200
+```
+
+Every HTTP request and every SQL query is printed. To filter just SQL: `docker run ... anuvia 2>&1 | grep "SELECT\|INSERT\|UPDATE\|DELETE"`
 
 ### Difference from normal local dev
 
@@ -415,8 +494,10 @@ http://localhost:8080/auth/login
 |---|---|---|
 | Command | `uvicorn app.main:app --reload` | `docker run --env-file .env.docker` |
 | Database | SQLite (`.env` default) | Neon PostgreSQL |
-| Hot reload | Yes | No (rebuild image to pick up changes) |
-| Matches Cloud Run | No | Yes |
+| `/docs` | Enabled | Enabled (`APP_ENV=development`) |
+| SQL query logs | Only if `DEBUG=true` in `.env` | Always on (`DEBUG=true` in `.env.docker`) |
+| Hot reload | Yes | No — rebuild image after code changes |
+| Matches Cloud Run | No | Yes (same image, same DB) |
 | Use when | Day-to-day coding | Debugging prod issues locally |
 
 ---

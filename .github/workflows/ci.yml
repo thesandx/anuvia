@@ -30,7 +30,6 @@ jobs:
       - name: Run tests
         run: pytest tests/ -v
         env:
-          # Dummy values — tests use in-memory SQLite, no real secrets needed
-          SECRET_KEY: ci-test-secret-key-not-used-in-production
-          DATABASE_URL: sqlite+aiosqlite:///:memory:
-          APP_ENV: development
+          SECRET_KEY: "ci-test-secret-key-not-used-in-production"
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          APP_ENV: "development"
