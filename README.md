@@ -361,6 +361,66 @@ Push to `main`. The deploy workflow runs automatically. After the first deploy s
 
 ---
 
+## Local Docker Testing (Production-like)
+
+Run the exact same Docker image locally but pointed at Neon — no SQLite, no dev shortcuts. This is the fastest way to catch environment issues before pushing to Cloud Run.
+
+### 1. Copy the env template
+
+```bash
+cp .env.docker.example .env.docker
+```
+
+### 2. Fill in `.env.docker`
+
+Open `.env.docker` and set real values:
+
+```bash
+APP_NAME=anuvia
+APP_ENV=production
+DEBUG=false
+SECRET_KEY=<generate with: python -c "import secrets; print(secrets.token_hex(32))">
+DATABASE_URL=postgresql+asyncpg://user:password@ep-xxx.us-east-2.aws.neon.tech/neondb
+```
+
+> `.env.docker` is git-ignored. Never commit it. It contains real credentials.
+
+### 3. Build the image
+
+```bash
+docker build -t anuvia .
+```
+
+### 4. Run it
+
+```bash
+docker run --env-file .env.docker -p 8080:8080 anuvia
+```
+
+This runs migrations against Neon first, then starts the server — identical to what Cloud Run does.
+
+### 5. Test it
+
+```
+http://localhost:8080/health     → {"status": "ok", "app": "anuvia"}
+http://localhost:8080/auth/register
+http://localhost:8080/auth/login
+```
+
+> `/docs` will be `404` because `APP_ENV=production` disables it. Change to `APP_ENV=development` in `.env.docker` if you want the Swagger UI locally.
+
+### Difference from normal local dev
+
+| | Normal local dev | Local Docker |
+|---|---|---|
+| Command | `uvicorn app.main:app --reload` | `docker run --env-file .env.docker` |
+| Database | SQLite (`.env` default) | Neon PostgreSQL |
+| Hot reload | Yes | No (rebuild image to pick up changes) |
+| Matches Cloud Run | No | Yes |
+| Use when | Day-to-day coding | Debugging prod issues locally |
+
+---
+
 ## Deployment: Manual (without GitHub Actions)
 
 If you prefer to deploy manually without CI/CD:
