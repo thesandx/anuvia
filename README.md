@@ -172,6 +172,110 @@ Tests use an in-memory SQLite database — `.env` is not required to run them.
 
 ---
 
+## Setting Up Turso (Production Database)
+
+Turso is a globally distributed SQLite database. It uses the same SQL dialect as the local SQLite dev database — zero friction, no schema differences between environments. The only thing that changes is `DATABASE_URL`.
+
+> Full CLI reference: [https://docs.turso.tech/sql-reference/cli/getting-started](https://docs.turso.tech/sql-reference/cli/getting-started)
+
+### 1. Install the Turso CLI
+
+**macOS:**
+
+```bash
+brew install tursodatabase/tap/turso
+```
+
+**Linux:**
+
+```bash
+curl -sSfL https://get.tur.so/install.sh | bash
+```
+
+**Windows:** Use WSL2 and run the Linux command above.
+
+### 2. Log in
+
+```bash
+turso auth login
+```
+
+Opens a browser to authenticate. Return to the terminal when done.
+
+### 3. Create a database
+
+```bash
+turso db create anuvia
+```
+
+Replace `anuvia` with whatever name you want. Turso automatically picks the nearest region.
+
+### 4. Get the database URL
+
+```bash
+turso db show anuvia
+```
+
+Look for the `URL` field in the output:
+
+```
+Name:    anuvia
+URL:     libsql://anuvia-yourname.turso.io
+```
+
+Copy that URL.
+
+### 5. Create an auth token
+
+```bash
+turso db tokens create anuvia
+```
+
+Outputs a long JWT string. Copy it.
+
+### 6. Assemble your DATABASE_URL
+
+Combine the URL and token into this format:
+
+```
+libsql+https://anuvia-yourname.turso.io?authToken=eyJhbGci...your-token
+```
+
+The pattern is:
+
+```
+libsql+https://<host from step 4, without libsql://>?authToken=<token from step 5>
+```
+
+### 7. Save it in your .env
+
+```bash
+DATABASE_URL=libsql+https://anuvia-yourname.turso.io?authToken=eyJhbGci...
+```
+
+### 8. Run migrations against Turso
+
+```bash
+alembic upgrade head
+```
+
+Alembic connects to Turso directly and creates all tables. Verify with:
+
+```bash
+turso db shell anuvia ".tables"
+# users  subscriptions  chat_sessions  chat_messages  alembic_version
+```
+
+### Where to put the DATABASE_URL
+
+| Environment | Where to set it |
+|---|---|
+| Local dev | `.env` file (already git-ignored) |
+| GitHub CI | Not needed — CI uses in-memory SQLite |
+| Production | GitHub Secret named `DATABASE_URL` → injected into Cloud Run at deploy |
+
+---
+
 ## Environment Variables Reference
 
 All variables are read from the environment by `app/core/config.py` using Pydantic Settings. In local dev they come from `.env`. In production they come from Cloud Run's environment.
