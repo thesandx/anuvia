@@ -9,9 +9,7 @@ class PaymentService:
         self.db = db
 
     async def get_subscription(self, user_id: int) -> Subscription | None:
-        result = await self.db.execute(
-            select(Subscription).where(Subscription.user_id == user_id)
-        )
+        result = await self.db.execute(select(Subscription).where(Subscription.user_id == user_id))
         return result.scalar_one_or_none()
 
     async def create_free_subscription(self, user_id: int) -> Subscription:

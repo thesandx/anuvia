@@ -16,6 +16,8 @@ class ChatMessage(Base, TimestampMixin):
     __tablename__ = "chat_messages"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    session_id: Mapped[int] = mapped_column(ForeignKey("chat_sessions.id"), index=True, nullable=False)
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("chat_sessions.id"), index=True, nullable=False
+    )
     role: Mapped[str] = mapped_column(String(20), nullable=False)  # user | assistant
     content: Mapped[str] = mapped_column(Text, nullable=False)

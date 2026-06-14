@@ -13,7 +13,7 @@ on:
 # GitHub Secrets (Settings → Secrets and variables → Secrets):
 #   GCP_SA_KEY           — service account JSON key (base64-encoded)
 #   SECRET_KEY           — JWT signing secret (min 32 chars)
-#   DATABASE_URL         — libsql+https://your-db.turso.io?authToken=your-token
+#   DATABASE_URL         — postgresql+asyncpg://user:password@ep-xxx.neon.tech/neondb
 #   STRIPE_SECRET_KEY    — (optional)
 #   STRIPE_WEBHOOK_SECRET — (optional)
 
