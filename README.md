@@ -540,6 +540,72 @@ gcloud run deploy anuvia \
 
 ---
 
+## Custom Domain Mapping
+
+Map your Cloud Run service to a custom domain (e.g. `api.yourdomain.com`).
+
+### 1. Verify domain ownership (first time only)
+
+If you haven't verified your domain with Google:
+
+1. Go to [Google Search Console](https://search.google.com/search-console) → Add property → enter your root domain (e.g. `yourdomain.com`)
+2. Choose **DNS record** verification — Google gives you a `TXT` record
+3. Add it in your DNS provider under Name `@`, Type `TXT`
+4. Click **Verify** in Search Console
+
+### 2. Create the domain mapping
+
+> Use `gcloud beta run` — the non-beta command does not support `--region` for managed Cloud Run yet.
+
+```bash
+gcloud beta run domain-mappings create \
+  --service anuvia \
+  --domain api.yourdomain.com \
+  --region us-central1
+```
+
+### 3. Get the DNS record to add
+
+```bash
+gcloud beta run domain-mappings describe \
+  --domain api.yourdomain.com \
+  --region us-central1
+```
+
+Look for `resourceRecords` in the output. It will show a `CNAME` record like:
+
+```
+resourceRecords:
+- name: api
+  rrdata: ghs.googlehosted.com.
+  type: CNAME
+```
+
+### 4. Add the record at your DNS provider
+
+In your DNS provider (e.g. Hostinger: hPanel → Domains → DNS / Nameservers → DNS Records → Add Record):
+
+| Type | Name | Points to |
+|---|---|---|
+| `CNAME` | `api` | `ghs.googlehosted.com.` |
+
+### 5. Wait for propagation
+
+- **DNS:** 5–30 min (Hostinger), up to 48h elsewhere
+- **SSL certificate:** Google provisions it automatically — another 15–30 min after DNS resolves
+
+Check when it's ready:
+
+```bash
+gcloud beta run domain-mappings describe \
+  --domain api.yourdomain.com \
+  --region us-central1
+```
+
+Look for `certificateStatus: ACTIVE`. After that, `https://api.yourdomain.com/health` is live.
+
+---
+
 ## Core Concepts
 
 ### Auto-Router Discovery
