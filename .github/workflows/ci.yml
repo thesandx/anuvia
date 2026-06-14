@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Format check (ruff)
+        run: ruff format --check .
+
+      - name: Run tests
+        run: pytest tests/ -v
+        env:
+          # Dummy values — tests use in-memory SQLite, no real secrets needed
+          SECRET_KEY: ci-test-secret-key-not-used-in-production
+          DATABASE_URL: sqlite+aiosqlite:///:memory:
+          APP_ENV: development

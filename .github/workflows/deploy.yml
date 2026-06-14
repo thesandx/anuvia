@@ -1,0 +1,73 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [main]
+
+# GitHub Variables (Settings → Secrets and variables → Variables):
+#   GCP_PROJECT_ID   — your Google Cloud project ID
+#   GCP_REGION       — e.g. us-central1
+#   CLOUD_RUN_SERVICE — e.g. anuvia
+#   APP_NAME         — e.g. anuvia
+#
+# GitHub Secrets (Settings → Secrets and variables → Secrets):
+#   GCP_SA_KEY           — service account JSON key (base64-encoded)
+#   SECRET_KEY           — JWT signing secret (min 32 chars)
+#   DATABASE_URL         — libsql+https://your-db.turso.io?authToken=your-token
+#   STRIPE_SECRET_KEY    — (optional)
+#   STRIPE_WEBHOOK_SECRET — (optional)
+
+env:
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  SERVICE:    ${{ vars.CLOUD_RUN_SERVICE }}
+  REGION:     ${{ vars.GCP_REGION }}
+  IMAGE:      gcr.io/${{ vars.GCP_PROJECT_ID }}/${{ vars.CLOUD_RUN_SERVICE }}
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Authenticate to Google Cloud using the service account key stored as a secret
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker --quiet
+
+      - name: Build and push Docker image
+        run: |
+          docker build -t $IMAGE:${{ github.sha }} -t $IMAGE:latest .
+          docker push $IMAGE:${{ github.sha }}
+          docker push $IMAGE:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy $SERVICE \
+            --image $IMAGE:${{ github.sha }} \
+            --region $REGION \
+            --platform managed \
+            --allow-unauthenticated \
+            --port 8080 \
+            --set-env-vars "APP_NAME=${{ vars.APP_NAME }}" \
+            --set-env-vars "APP_ENV=production" \
+            --set-env-vars "DEBUG=false" \
+            --set-env-vars "SECRET_KEY=${{ secrets.SECRET_KEY }}" \
+            --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" \
+            --set-env-vars "STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}" \
+            --set-env-vars "STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}"
+
+      - name: Show deployed URL
+        run: |
+          URL=$(gcloud run services describe $SERVICE --region $REGION --format 'value(status.url)')
+          echo "Deployed to: $URL"
