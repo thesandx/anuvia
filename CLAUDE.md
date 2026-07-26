@@ -283,7 +283,7 @@ Violations here are defects, not style disagreements.
 | Log a token, a password, or a full connection string        | Use `app/core/logging.py`. Never log a secret.                                                                  |
 | Deploy application-local SQLite to Cloud Run                | The filesystem is ephemeral and unshared. Data is lost on the next instance. See [the multi-region decision](#the-multi-region-decision). |
 | Disable a CI check to make a PR green                       | Fix the code, or change the check deliberately and say why.                                                     |
-| Claim work is done without running the gate                 | See [Verification protocol](#verification-protocol).                                                            |
+| Push, claim work is done, or open a PR without the gate green | Run `ruff check`, `ruff format --check`, and `pytest` locally first — including the format check. CI must never fail from your end. See [Verification protocol](#verification-protocol). |
 
 ---
 
@@ -337,13 +337,19 @@ Missing any step breaks somebody:
 
 **Never describe unverified work as working.** If a check fails, report the failure with its output.
 
-Minimum, always:
+**Run the full gate and get it green _before every push_ — never push work that will fail CI from your end.** These three commands are exactly what CI runs, so a green local run is a green CI run. A push that turns CI red on something you could have run locally (a formatting miss, a lint error, a failing test) wastes a CI round and a review cycle.
+
+Minimum, always — before you push:
 
 ```bash
 ruff check .
 ruff format --check .
 pytest tests/ -v
 ```
+
+- **`ruff format --check .` is part of the gate, not optional.** The most common self-inflicted CI failure is a formatting-only miss — for example, editing a Markdown table re-widens its columns. CI fails it exactly like a broken test. Always run `ruff format .` (which writes the fix) and then `ruff format --check .` (which confirms it) before you push.
+- **If you cannot run the gate locally** (no virtualenv, missing dependencies), install them and run it. If you truly cannot, do not push silently — say so explicitly and treat the work as unverified.
+- **After you push, watch the checks.** If CI still fails, fix it and push again; work is not done until CI is green.
 
 If you touched the `Dockerfile`, `requirements.txt`, migrations, or the env model:
 
