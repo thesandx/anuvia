@@ -19,15 +19,15 @@ steps:
   - id: auth
     uses: google-github-actions/auth@v2
     with:
-      workload_identity_provider: ${{ vars.WIF_PROVIDER }}
-      service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+      workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+      service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 ```
 
 GitHub presents a token that proves "this run is from `thesandx/anuvia`". Google exchanges it for temporary credentials scoped to the deployer service account. The token expires in minutes and cannot be reused elsewhere.
 
 > **History:** the pipeline used a `GCP_SA_KEY` secret before. A key is a long-lived bearer credential — valid until revoked if it leaks. It has been removed in favour of federation. Do not reintroduce a key.
 
-The deployer service account keeps only the roles it needs: `roles/run.admin`, `roles/storage.admin` (or an Artifact Registry writer role), and `roles/iam.serviceAccountUser`.
+The deployer service account keeps only the roles it needs: `roles/run.admin`, `roles/artifactregistry.writer`, and `roles/iam.serviceAccountUser`.
 
 ---
 
@@ -60,12 +60,14 @@ The `attribute-condition` is the security boundary. It binds the credential to *
 
 ### The GitHub side (already wired in `deploy.yml`)
 
-`deploy.yml` reads two **variables** — not secrets, since neither is sensitive. Set them in Settings → Secrets and variables → Actions → Variables:
+`deploy.yml` reads two values from GitHub **secrets**. Set them in Settings → Secrets and variables → Actions → Secrets:
 
-| Variable | Value |
+| Secret | Value |
 | --- | --- |
 | `WIF_PROVIDER` | the provider resource name from step 2 above (`projects/NUMBER/locations/global/workloadIdentityPools/github-pool/providers/github-provider`) |
 | `WIF_SERVICE_ACCOUNT` | the deployer email (`github-deployer@YOUR_PROJECT_ID.iam.gserviceaccount.com`) |
+
+> Neither value is truly sensitive, so plain variables would also work. This repository keeps them as **secrets** to match the `nextjs-cloudrun-template`. If you switch them to variables, change `deploy.yml` to read `${{ vars.WIF_* }}`.
 
 The job also declares `permissions: id-token: write`, which lets GitHub mint the OIDC token. That permission is on the deploy job only — keep it off every other job.
 

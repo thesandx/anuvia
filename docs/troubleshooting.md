@@ -131,7 +131,7 @@ Then run autogenerate again.
 
 ### The deploy authenticated but cannot push or deploy
 
-**Cause:** the service account lacks a role. It needs `roles/run.admin`, `roles/storage.admin` (or Artifact Registry writer), and `roles/iam.serviceAccountUser`.
+**Cause:** the service account lacks a role. It needs `roles/run.admin`, `roles/artifactregistry.writer`, and `roles/iam.serviceAccountUser`.
 
 **Fix:** grant the missing role. See [`cloud/github-actions.md`](../cloud/github-actions.md).
 

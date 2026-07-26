@@ -9,11 +9,12 @@ on:
 #   GCP_REGION           — e.g. us-central1
 #   CLOUD_RUN_SERVICE    — e.g. anuvia
 #   APP_NAME             — e.g. anuvia
+#   ARTIFACT_REPOSITORY  — Artifact Registry repo name, e.g. containers
+#
+# GitHub Secrets (Settings → Secrets and variables → Secrets):
 #   WIF_PROVIDER         — Workload Identity provider resource name
 #                          (projects/NUMBER/locations/global/workloadIdentityPools/POOL/providers/PROVIDER)
 #   WIF_SERVICE_ACCOUNT  — deployer SA email (github-deployer@PROJECT.iam.gserviceaccount.com)
-#
-# GitHub Secrets (Settings → Secrets and variables → Secrets):
 #   SECRET_KEY           — JWT signing secret (min 32 chars)
 #   DATABASE_URL         — postgresql+asyncpg://user:password@ep-xxx.neon.tech/neondb
 #   STRIPE_SECRET_KEY    — (optional)
@@ -21,12 +22,13 @@ on:
 #
 # Authentication is keyless via Workload Identity Federation — there is no
 # service account key. See cloud/github-actions.md for the one-time GCP setup.
+# The image is pushed to Artifact Registry (not the deprecated gcr.io).
 
 env:
   PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
   SERVICE:    ${{ vars.CLOUD_RUN_SERVICE }}
   REGION:     ${{ vars.GCP_REGION }}
-  IMAGE:      gcr.io/${{ vars.GCP_PROJECT_ID }}/${{ vars.CLOUD_RUN_SERVICE }}
+  IMAGE:      ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REPOSITORY }}/${{ vars.CLOUD_RUN_SERVICE }}
 
 jobs:
   deploy:
@@ -48,13 +50,13 @@ jobs:
       - id: auth
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
-          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
       - uses: google-github-actions/setup-gcloud@v2
 
-      - name: Configure Docker for GCR
-        run: gcloud auth configure-docker --quiet
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${REGION}-docker.pkg.dev --quiet
 
       - name: Build and push Docker image
         run: |

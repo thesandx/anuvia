@@ -191,7 +191,7 @@ HTTP request
 
 **The auto-loader** (`app/core/router_loader.py`) scans `app/apps/*` at startup and registers each `router.py`. Each router sets its own `PREFIX` and `TAGS`. This is why you never edit `main.py` to add a product. See [Trap 1](#trap-1).
 
-**Deployment:** `git push main` → GitHub Actions (`deploy.yml`) → build image → push to Google Container Registry → deploy to Cloud Run. The image tags with the commit SHA and Cloud Run deploys that immutable tag, so a rollback is a traffic shift, not a rebuild.
+**Deployment:** `git push main` → GitHub Actions (`deploy.yml`) → build image → push to Artifact Registry → deploy to Cloud Run. The image tags with the commit SHA and Cloud Run deploys that immutable tag, so a rollback is a traffic shift, not a rebuild.
 
 ---
 

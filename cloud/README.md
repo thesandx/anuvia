@@ -21,7 +21,7 @@ GitHub Actions builds the FastAPI app into a small Python container. It pushes t
 | Service               | Role                                       | Why this one                                             |
 | --------------------- | ------------------------------------------ | -------------------------------------------------------- |
 | **Cloud Run**         | Runs the container, autoscales, ends TLS    | Serverless containers, scale-to-zero, per-request billing |
-| **Container registry**| Stores the image                            | The deploy target for the built image                    |
+| **Artifact Registry** | Stores the image                            | The modern registry (successor to `gcr.io`), regional, IAM-integrated |
 | **Cloud Logging**     | Log aggregation and search                  | Automatic — Cloud Run forwards stdout/stderr            |
 | **Secret Manager**    | Secret storage (hardening target)           | Versioned, IAM-controlled; mounted into Cloud Run        |
 | **IAM**               | Deploy identity                             | Grants the pipeline permission to push and deploy        |
@@ -33,9 +33,10 @@ The database (Neon) is **not** a Google Cloud service. It is a separate managed 
 Enable once, before the first deploy:
 
 ```bash
-gcloud services enable run.googleapis.com containerregistry.googleapis.com
-# Add when you adopt the hardening path:
-gcloud services enable secretmanager.googleapis.com iamcredentials.googleapis.com sts.googleapis.com
+gcloud services enable run.googleapis.com artifactregistry.googleapis.com \
+  iamcredentials.googleapis.com sts.googleapis.com
+# Add when you adopt Secret Manager for app secrets:
+gcloud services enable secretmanager.googleapis.com
 ```
 
 ## Cost model
