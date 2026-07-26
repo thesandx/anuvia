@@ -5,17 +5,22 @@ on:
     branches: [main]
 
 # GitHub Variables (Settings → Secrets and variables → Variables):
-#   GCP_PROJECT_ID   — your Google Cloud project ID
-#   GCP_REGION       — e.g. us-central1
-#   CLOUD_RUN_SERVICE — e.g. anuvia
-#   APP_NAME         — e.g. anuvia
+#   GCP_PROJECT_ID       — your Google Cloud project ID
+#   GCP_REGION           — e.g. us-central1
+#   CLOUD_RUN_SERVICE    — e.g. anuvia
+#   APP_NAME             — e.g. anuvia
+#   WIF_PROVIDER         — Workload Identity provider resource name
+#                          (projects/NUMBER/locations/global/workloadIdentityPools/POOL/providers/PROVIDER)
+#   WIF_SERVICE_ACCOUNT  — deployer SA email (github-deployer@PROJECT.iam.gserviceaccount.com)
 #
 # GitHub Secrets (Settings → Secrets and variables → Secrets):
-#   GCP_SA_KEY           — service account JSON key (base64-encoded)
 #   SECRET_KEY           — JWT signing secret (min 32 chars)
 #   DATABASE_URL         — postgresql+asyncpg://user:password@ep-xxx.neon.tech/neondb
 #   STRIPE_SECRET_KEY    — (optional)
 #   STRIPE_WEBHOOK_SECRET — (optional)
+#
+# Authentication is keyless via Workload Identity Federation — there is no
+# service account key. See cloud/github-actions.md for the one-time GCP setup.
 
 env:
   PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
@@ -30,15 +35,21 @@ jobs:
 
     permissions:
       contents: read
+      id-token: write # required to mint the OIDC token for Workload Identity Federation
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
-      # Authenticate to Google Cloud using the service account key stored as a secret
+      # Authenticate to Google Cloud with a short-lived OIDC token (no key).
+      # GitHub presents the token; Google exchanges it for temporary credentials
+      # scoped to the deployer service account. See cloud/github-actions.md.
       - id: auth
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
 
       - uses: google-github-actions/setup-gcloud@v2
 

@@ -81,15 +81,18 @@ This change is tracked in [ADR-0003](../../docs/adr/0003-single-region-now-multi
 
 ## Authentication to Google Cloud
 
-`deploy.yml` currently authenticates with a service account **key** stored as the `GCP_SA_KEY` secret:
+`deploy.yml` authenticates with **Workload Identity Federation** — no key:
 
 ```yaml
+permissions:
+  id-token: write            # lets GitHub mint the OIDC token
 - uses: google-github-actions/auth@v2
   with:
-    credentials_json: ${{ secrets.GCP_SA_KEY }}
+    workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+    service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
 ```
 
-A key is a long-lived bearer credential. If it leaks, it is valid until someone revokes it. The stronger pattern is **Workload Identity Federation**: GitHub presents a short-lived OIDC token, Google exchanges it for temporary credentials, and no key exists anywhere. The migration is documented in [`cloud/github-actions.md`](../../cloud/github-actions.md). Until then, treat `GCP_SA_KEY` as highly sensitive and rotate it if there is any doubt.
+GitHub presents a short-lived OIDC token bound to this repository, Google exchanges it for temporary credentials, and no key exists anywhere. The `id-token: write` permission is on the deploy job only. Do not reintroduce a service account key — the setup is documented in [`cloud/github-actions.md`](../../cloud/github-actions.md).
 
 ---
 

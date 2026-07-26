@@ -319,6 +319,8 @@ Click **Variables** → **New repository variable**:
 | `GCP_REGION` | `us-central1` | Cloud Run deployment region |
 | `CLOUD_RUN_SERVICE` | `anuvia` | Name of the Cloud Run service |
 | `APP_NAME` | `anuvia` | Application name passed to the container |
+| `WIF_PROVIDER` | `projects/NUMBER/locations/global/workloadIdentityPools/github-pool/providers/github-provider` | Workload Identity provider resource name |
+| `WIF_SERVICE_ACCOUNT` | `github-deployer@my-project-123.iam.gserviceaccount.com` | Deployer service account email |
 
 #### Secrets (sensitive — masked in logs, never visible after saving)
 
@@ -326,15 +328,16 @@ Click **Secrets** → **New repository secret**:
 
 | Name | Description |
 |---|---|
-| `GCP_SA_KEY` | Service account JSON key for GCP deployment (see below) |
 | `SECRET_KEY` | JWT signing secret — run `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `DATABASE_URL` | Your Neon connection string (copy from Neon dashboard → Connect → SQLAlchemy asyncpg) |
 | `STRIPE_SECRET_KEY` | Your Stripe secret key (optional — leave empty if not using payments) |
 | `STRIPE_WEBHOOK_SECRET` | Your Stripe webhook secret (optional) |
 
-### Creating the GCP Service Account
+There is **no** `GCP_SA_KEY` — the deploy authenticates without a key (see below).
 
-The deploy workflow needs a GCP service account with permission to push Docker images and deploy to Cloud Run.
+### Creating the GCP Service Account (keyless)
+
+The deploy workflow needs a service account that can push images and deploy to Cloud Run, and a Workload Identity Federation trust so GitHub can use it **without a key**.
 
 ```bash
 # Set your project
@@ -345,30 +348,16 @@ gcloud iam service-accounts create github-deployer \
   --display-name "GitHub Actions Deployer"
 
 # Grant required roles
-gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
-  --member "serviceAccount:github-deployer@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
-  --role "roles/run.admin"
-
-gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
-  --member "serviceAccount:github-deployer@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
-  --role "roles/storage.admin"
-
-gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
-  --member "serviceAccount:github-deployer@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
-  --role "roles/iam.serviceAccountUser"
-
-# Download the JSON key
-gcloud iam service-accounts keys create key.json \
-  --iam-account github-deployer@YOUR_PROJECT_ID.iam.gserviceaccount.com
-
-# Copy the entire contents of key.json → paste as the GCP_SA_KEY secret
-cat key.json
-
-# Delete the local key file — it's now in GitHub Secrets
-rm key.json
+for ROLE in roles/run.admin roles/storage.admin roles/iam.serviceAccountUser; do
+  gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+    --member "serviceAccount:github-deployer@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+    --role "$ROLE"
+done
 ```
 
-> **Security note:** The service account key (`key.json`) must be deleted locally immediately after pasting into GitHub Secrets. It must never be committed to git. The `.gitignore` already excludes `*.json` credential files by extension pattern — but treat it as highly sensitive regardless.
+Then set up Workload Identity Federation (pool, provider bound to your repo, and the impersonation binding) and read off the `WIF_PROVIDER` value. The full command set is in [`cloud/github-actions.md`](./cloud/github-actions.md).
+
+> **Do not create a service account key.** Federation replaces the long-lived key with a short-lived OIDC token minted per run and bound to this repository. No key means nothing to leak, rotate, or delete.
 
 ### First deploy
 
@@ -557,7 +546,7 @@ gcloud run deploy anuvia \
 - [ ] `APP_ENV=production` — disables `/docs` and `/redoc`
 - [ ] `SECRET_KEY` is at least 32 random characters
 - [ ] `DATABASE_URL` points to Neon PostgreSQL (not local SQLite)
-- [ ] `GCP_SA_KEY` local file deleted after saving to GitHub Secrets
+- [ ] Deploy is keyless (Workload Identity Federation); no `GCP_SA_KEY` exists and any old key is deleted
 - [ ] CORS origins restricted to your actual frontend domain (in `app/main.py`)
 - [ ] Cloud Run min-instances set to 1 if cold starts are unacceptable
 
