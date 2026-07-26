@@ -361,7 +361,7 @@ alembic downgrade -1
 alembic upgrade head
 ```
 
-If you touched a workflow: YAML that parses is not a workflow that runs. `ci.yml` runs on every push; `deploy.yml` only runs on `main`.
+If you touched a workflow: YAML that parses is not a workflow that runs. The gate is `ci.yml` (job `Lint & Test` plus `Docker image builds`) and `codeql.yml` (job `Analyze python`); `deploy.yml` only runs on `main`. All three gate checks must be green before a merge — see [`.github/instructions/github-workflows.md`](./.github/instructions/github-workflows.md).
 
 ---
 

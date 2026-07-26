@@ -122,12 +122,17 @@ You do not need to test framework behaviour (Pydantic already rejects a malforme
 
 ## The gate
 
-CI runs exactly three checks (`.github/workflows/ci.yml`):
+The local gate is three commands (`.github/workflows/ci.yml` runs the same, in the `Lint & Test` job):
 
 ```bash
 ruff check .
 ruff format --check .
 pytest tests/ -v
 ```
+
+CI adds two checks you cannot fully reproduce with one command, both on every pull request:
+
+- **`Docker image builds`** — builds the production image and smoke-tests `/health` in the running container. Reproduce it locally with `docker build -t anuvia . && docker run -e SECRET_KEY=x -p 8080:8080 anuvia`, then `curl localhost:8080/health`.
+- **`Analyze python`** — CodeQL static security analysis (`codeql.yml`). It runs in GitHub, not locally; read its findings in the repository Security tab.
 
 Run all three before you call the work done. A green `pytest` with a failing `ruff` still fails CI.

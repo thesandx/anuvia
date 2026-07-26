@@ -68,7 +68,7 @@ Not strictly a security issue, but a reliability one: concurrent instances race 
 - [ ] Deploy authenticates via Workload Identity Federation, not a key (gap 2).
 - [ ] Secrets come from Secret Manager, not `--set-env-vars` (gap 3).
 - [ ] Migrations run as a deploy-time step, not in the container `CMD` (gap 4).
-- [ ] Branch protection on `main` requires a pull request and the `Lint & Test` check.
+- [ ] Branch protection on `main` requires a pull request and the gate checks: `Lint & Test`, `Docker image builds`, and `Analyze python` (CodeQL).
 - [ ] Any AI or payment provider key is a secret, never in source or a `NEXT_PUBLIC`-style public value.
 - [ ] Logs contain no token, password, or full connection string.
 - [ ] A budget alert is set on the Google Cloud billing account.

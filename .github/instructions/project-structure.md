@@ -37,7 +37,7 @@ anuvia/
 ├── tests/
 │   ├── conftest.py             # In-memory SQLite + async test client.
 │   └── test_*.py
-├── .github/workflows/          # ci.yml, deploy.yml
+├── .github/workflows/          # ci.yml, codeql.yml, deploy.yml
 ├── docs/                       # How things work; ADRs.
 ├── cloud/                      # Google Cloud setup and runbooks.
 ├── Dockerfile

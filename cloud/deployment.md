@@ -66,7 +66,7 @@ Repository → Settings → Secrets and variables → Actions.
 
 ### 5. Enable branch protection on `main`
 
-Require a pull request and a passing `Lint & Test` check before merge. The README "Branch Protection" section has the exact settings and the CLI command.
+Require a pull request and the passing gate checks — `Lint & Test`, `Docker image builds`, and `Analyze python` — before merge. The README "Branch Protection" section has the exact settings and the CLI command.
 
 ---
 
@@ -156,6 +156,6 @@ Because each revision is tied to an immutable SHA-tagged image, you always know 
 - [ ] `SECRET_KEY` is at least 32 random characters.
 - [ ] `DATABASE_URL` is the Neon `postgresql+asyncpg://` form, no `sslmode` query parameter.
 - [ ] Neon project is in the same geography as `GCP_REGION`.
-- [ ] Branch protection on `main` requires `Lint & Test`.
+- [ ] Branch protection on `main` requires `Lint & Test`, `Docker image builds`, and `Analyze python`.
 - [ ] CORS origins restricted to your real frontend (before real users) — see [SECURITY.md](../SECURITY.md).
 - [ ] A budget alert is set.

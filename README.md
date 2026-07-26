@@ -66,7 +66,8 @@ anuvia/
 │
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml           # Lint + test on every push and PR
+│       ├── ci.yml           # Lint + test + Docker build/smoke test on every push and PR
+│       ├── codeql.yml       # CodeQL static security analysis
 │       └── deploy.yml       # Build + deploy to Cloud Run on push to main
 │
 ├── app/
@@ -296,10 +297,11 @@ DATABASE_URL=postgresql+asyncpg://user:password@ep-xxx.us-east-2.aws.neon.tech/n
 
 | Trigger | Workflow | What it does |
 |---|---|---|
-| Every push, every PR | `ci.yml` | Runs Ruff lint + format check + pytest |
+| Every push, every PR into `main` | `ci.yml` | Ruff lint + format check + pytest, and a Docker build + container smoke test |
+| PR into `main`, push to `main`, weekly | `codeql.yml` | CodeQL static security analysis (free — the repo is public) |
 | Push to `main` | `deploy.yml` | Builds Docker image, pushes to GCR, deploys to Cloud Run |
 
-CI uses dummy secrets (hardcoded in the workflow file) and an in-memory database — it never needs real credentials.
+The gate (`ci.yml` + `codeql.yml`) uses dummy secrets and SQLite — it never needs real credentials, so a fork's PR still runs. The three required checks are `Lint & Test`, `Docker image builds`, and `Analyze python`.
 
 The deploy workflow reads real secrets from GitHub and injects them as Cloud Run environment variables at deploy time.
 
@@ -397,16 +399,18 @@ Set **Branch name pattern** to `main`, then enable:
 | Require a pull request before merging | ✅ | No direct pushes to main |
 | Required approving reviews | `0` | Solo founder — no second reviewer needed, PR is still required |
 | Require status checks to pass before merging | ✅ | CI must be green before merge |
-| Status check to require | `Lint & Test` | The job name in `ci.yml` |
+| Status checks to require | `Lint & Test`, `Docker image builds`, `Analyze python` | The job names in `ci.yml` and `codeql.yml` |
 | Require branches to be up to date | ✅ | Branch must be current with main before merging |
 | Do not allow bypassing the above settings | ❌ (off) | Lets you override as admin if you're ever stuck |
+
+> The check names appear in the list only after each workflow has run at least once. Open a throwaway PR first so the checks report, then add them as required.
 
 Or via GitHub CLI:
 
 ```bash
 gh api repos/{owner}/{repo}/branches/main/protection \
   --method PUT \
-  --field 'required_status_checks={"strict":true,"contexts":["Lint & Test"]}' \
+  --field 'required_status_checks={"strict":true,"contexts":["Lint & Test","Docker image builds","Analyze python"]}' \
   --field 'enforce_admins=false' \
   --field 'required_pull_request_reviews={"required_approving_review_count":0}' \
   --field 'restrictions=null'

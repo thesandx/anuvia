@@ -1,17 +1,36 @@
 name: CI
 
+# The pre-merge gate. Runs on every pull request into main, on direct pushes
+# to main as a safety net, and on any branch push for fast feedback. Nothing
+# here touches Google Cloud, so the job needs no cloud credentials — keep it
+# that way so a fork's pull request still runs.
 on:
   push:
     branches: ["**"]
   pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Least privilege: the checks only read the repository.
+permissions:
+  contents: read
+
+# A new push to the same ref cancels the previous run. Saves minutes and stops
+# a stale run from reporting after a newer one.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     name: Lint & Test
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-python@v5
         with:
@@ -33,3 +52,60 @@ jobs:
           SECRET_KEY: "ci-test-secret-key-not-used-in-production"
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
           APP_ENV: "development"
+
+  docker:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        # Proves the production image still builds on every pull request.
+        # Nothing is pushed — a broken Dockerfile should fail review, not
+        # deploy day.
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: anuvia:ci-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test the container
+        # Boots the real image and waits for /health. Catches the failures a
+        # build alone cannot: the app failing to start, migrations failing on
+        # boot, binding to localhost instead of 0.0.0.0, or ignoring $PORT.
+        # The container uses its default SQLite database, so the smoke test
+        # needs no external database — the same choice the unit tests make.
+        run: |
+          set -euo pipefail
+          IMAGE="anuvia:ci-${{ github.sha }}"
+          docker run -d --name smoke -p 8080:8080 \
+            -e PORT=8080 \
+            -e APP_ENV=production \
+            -e SECRET_KEY=ci-smoke-secret-not-used-in-production \
+            -e DATABASE_URL="sqlite+aiosqlite:////app/smoke.db" \
+            "$IMAGE"
+
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/health > /dev/null; then
+              echo "Health check passed on attempt ${attempt}"
+              curl -fsS http://localhost:8080/health
+              docker rm -f smoke > /dev/null
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "::error::Container did not become healthy within 60s"
+          docker logs smoke
+          docker rm -f smoke > /dev/null
+          exit 1

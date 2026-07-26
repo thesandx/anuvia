@@ -4,48 +4,56 @@ Read this before you touch anything in `.github/workflows/`.
 
 ---
 
-## The two workflows
+## The three workflows
 
-| File          | Trigger                    | Purpose                                          |
-| ------------- | -------------------------- | ------------------------------------------------ |
-| `ci.yml`      | Every push, every pull request | Lint, format check, and test.                |
-| `deploy.yml`  | Push to `main`             | Build the image, push it, deploy to Cloud Run.   |
+| File          | Trigger                              | Purpose                                          |
+| ------------- | ------------------------------------ | ------------------------------------------------ |
+| `ci.yml`      | Every push, every pull request into `main`, manual | Lint, format check, test, and a Docker build + smoke test. |
+| `codeql.yml`  | Pull request into `main`, push to `main`, weekly, manual | Static security analysis (CodeQL). |
+| `deploy.yml`  | Push to `main`                       | Build the image, push it, deploy to Cloud Run.   |
 
-`ci.yml` is the gate. `deploy.yml` is the release. They never overlap: CI needs no cloud credentials, and deploy runs only after a merge to `main`.
+`ci.yml` and `codeql.yml` are the pre-merge gate. `deploy.yml` is the release. They never overlap: the gate needs no cloud credentials, and deploy runs only after a merge to `main`.
+
+The gate has **three required checks**: `Lint & Test`, `Docker image builds`, and `Analyze python`. Require all three in branch protection. See [`cloud/deployment.md`](../../cloud/deployment.md).
 
 ---
 
 ## ci.yml
 
+Two jobs run in parallel.
+
+**Job `test` (`Lint & Test`)** — the fast gate:
+
 ```yaml
-name: CI
-on:
-  push:
-    branches: ["**"]
-  pull_request:
-jobs:
-  test:
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: "pip"
-      - run: pip install -r requirements.txt
-      - run: ruff check .
-      - run: ruff format --check .
-      - run: pytest tests/ -v
-        env:
-          SECRET_KEY: "ci-test-secret-key-not-used-in-production"
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          APP_ENV: "development"
+- run: ruff check .              # lint
+- run: ruff format --check .     # format check
+- run: pytest tests/ -v          # tests, dummy SECRET_KEY, in-memory SQLite
 ```
+
+**Job `docker` (`Docker image builds`)** — proves the production image works:
+
+- Builds the real image with Buildx and the GitHub Actions cache. Nothing is pushed.
+- Boots the container and polls `/health` until it answers. This catches what a build alone cannot: the app failing to start, migrations failing on boot, binding to `localhost` instead of `0.0.0.0`, or ignoring `$PORT`.
+- The container uses its default SQLite database, so the smoke test needs no external database — the same choice the unit tests make.
 
 Rules:
 
-- **CI uses dummy secrets and an in-memory database.** The `SECRET_KEY` and `DATABASE_URL` in the `env:` block are throwaway values. CI never needs a real credential. Keep it that way — it is what lets a fork run CI.
-- **The three steps match the local gate.** If `ruff check`, `ruff format --check`, and `pytest` pass locally, they pass in CI. If they do not, your local environment differs from `requirements.txt`.
-- **The job name is `Lint & Test`.** Branch protection requires this exact name as a status check. If you rename the job, update the branch protection rule.
+- **The gate uses dummy secrets and SQLite.** The `SECRET_KEY` and `DATABASE_URL` are throwaway values. The gate never needs a real credential. Keep it that way — it is what lets a fork's pull request run.
+- **The `test` steps match the local gate.** If `ruff check`, `ruff format --check`, and `pytest` pass locally, they pass in CI. If they do not, your local environment differs from `requirements.txt`.
+- **The job names are `Lint & Test` and `Docker image builds`.** Branch protection requires these exact names. If you rename a job, update the branch protection rule.
+- **`permissions: contents: read` and `concurrency` cancel-in-progress.** The gate only reads the repository, and a new push cancels the superseded run.
+
+---
+
+## codeql.yml
+
+CodeQL runs static security analysis on the Python source and uploads findings to the Security tab.
+
+Rules:
+
+- **CodeQL is free on public repositories.** anuvia is public, so it works with no setup. On a **private** repository it needs GitHub Advanced Security; without it the analysis runs, then fails at upload. If you make the repository private and lack GHAS, delete `codeql.yml` rather than leave a permanently red check.
+- **`build-mode: none`.** Python needs no build, so CodeQL scans the source directly. Do not add an autobuild step.
+- **`security-events: write` on the job only.** That permission is needed to upload results. Keep it scoped to this job.
 
 ---
 
