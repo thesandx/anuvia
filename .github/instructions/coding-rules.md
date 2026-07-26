@@ -130,10 +130,12 @@ Same pull request. Not "later". This covers a change in **how something works**,
 
 ---
 
-## 11. Verify before you claim
+## 11. Verify before you claim — and before you push
 
-- Run the gate before you say the work is done: `ruff check .`, `ruff format --check .`, `pytest tests/ -v`.
+- **Run the gate before every push, not only before you claim the work is done:** `ruff check .`, `ruff format --check .`, `pytest tests/ -v`. These three are exactly what CI runs, so a green local run is a green CI run. **CI must never fail on something you could have caught locally.**
+- **Run the formatter, not just the format check.** The most common self-inflicted CI failure is a formatting miss — for example, editing a Markdown table re-widens its columns. Run `ruff format .` to write the fix, then `ruff format --check .` to confirm, before you push.
 - If a check fails, report the failure with its output. Do not describe unverified work as working.
+- If you cannot run the gate locally, install the dependencies and run it. If you truly cannot, do not push silently — say so and treat the work as unverified.
 - Changed the Dockerfile or dependencies? Build the image and run the container. `docker build -t anuvia .` then `docker run --env-file .env.docker -p 8080:8080 anuvia`, then `curl localhost:8080/health`.
 - Changed a migration? Confirm it applies and rolls back.
 
