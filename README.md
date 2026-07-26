@@ -8,6 +8,25 @@ A **modular monolith** FastAPI template built for solo founders who want to ship
 
 ---
 
+## Documentation
+
+This README is the tour. The operating manual and the deep docs live alongside the code. Read the relevant one before you work in that area.
+
+| Document | Read it when |
+|---|---|
+| [`CLAUDE.md`](./CLAUDE.md) | **Start here.** The operating manual: rules, traps, and the multi-region decision. |
+| [`.github/instructions/`](./.github/instructions/) | Writing code — the rules, structure, standards, and architecture in full. |
+| [`docs/local-development.md`](./docs/local-development.md) | Setting up or working locally. |
+| [`docs/testing.md`](./docs/testing.md) | Writing tests. |
+| [`docs/troubleshooting.md`](./docs/troubleshooting.md) | **Anything failing.** Symptom → cause → fix. |
+| [`docs/adr/`](./docs/adr/) | Asking "why is it done this way?" |
+| [`cloud/`](./cloud/) | Deploying, configuring, or setting up Google Cloud. |
+| [`cloud/multi-region.md`](./cloud/multi-region.md) | Thinking about regions, replicas, and global latency. |
+| [`SECURITY.md`](./SECURITY.md) | The security model and the pre-production hardening checklist. |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | Making a change. |
+
+---
+
 ## Why this architecture?
 
 | Approach | Problem |
