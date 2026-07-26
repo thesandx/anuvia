@@ -1,0 +1,64 @@
+name: CodeQL
+
+# Static application security testing. Runs on pull requests so findings block
+# review, and weekly so newly published queries reach code that has not
+# changed. Results land in the repository Security tab.
+#
+# CodeQL is free on PUBLIC repositories. anuvia is public, so this works as-is.
+# On a PRIVATE repository it needs GitHub Advanced Security — without it the
+# analysis runs, then fails at upload with "Code scanning is not enabled for
+# this repository". If you make this repository private and do not have GHAS,
+# delete this file rather than leave a permanently red check.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Mondays 03:17 UTC. Off the hour to avoid GitHub's scheduling stampede.
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze ${{ matrix.language }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      security-events: write # required to upload SARIF results
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # Python needs no build step, so CodeQL scans the source directly.
+          build-mode: none
+          # `security-and-quality` adds maintainability queries on top of the
+          # default security set. Drop to `security-extended` if the noise
+          # outweighs the value.
+          queries: security-and-quality
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:${{ matrix.language }}
