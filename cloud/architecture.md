@@ -13,7 +13,7 @@ The target architecture for anuvia on Google Cloud, the service boundaries, and 
                                            └────────┬──────────┘
                                         build image │ push + deploy
                                            ┌────────▼──────────┐
-                                           │ Container registry │
+                                           │ Artifact Registry  │
                                            └────────┬──────────┘
                                            deploy   │ SHA tag
                                            ┌────────▼──────────┐        TLS, autoscale
@@ -35,7 +35,7 @@ The target architecture for anuvia on Google Cloud, the service boundaries, and 
 | Component          | Responsibility                                                          |
 | ------------------ | ----------------------------------------------------------------------- |
 | **Cloud Run**      | Runs the container, ends TLS, autoscales from zero, injects `PORT`.      |
-| **Container registry** | Stores each built image by SHA tag.                                 |
+| **Artifact Registry** | Stores each built image by SHA tag (regional, in the Cloud Run region). |
 | **GitHub Actions** | Builds, pushes, and deploys on push to `main`.                          |
 | **Neon**           | The production database. Serverless PostgreSQL, same geography as Cloud Run. |
 | **Cloud Logging**  | Collects the container's stdout/stderr automatically.                   |
@@ -83,7 +83,7 @@ With min-instances 0, the first request after idle pays a cold start: the contai
 | ---------------------------- | ----------------------------------------------- |
 | Cloud Run compute            | Per request-time (CPU + memory), plus per request |
 | Cloud Run idle               | $0 at min-instances 0                            |
-| Container registry storage   | A few cents per GB per month                     |
+| Artifact Registry storage    | A few cents per GB per month                     |
 | Cloud Logging                | Free within the monthly allotment               |
 | Neon                         | Free tier at low traffic; paid tiers for replicas and more compute |
 

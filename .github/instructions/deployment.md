@@ -10,7 +10,7 @@ Read this before you touch the `Dockerfile`, an environment variable, a migratio
 
 1. Authenticates to Google Cloud.
 2. Builds the Docker image and tags it with the commit SHA and `latest`.
-3. Pushes both tags to Google Container Registry.
+3. Pushes both tags to Artifact Registry.
 4. Deploys the **SHA-tagged** image to Cloud Run with the runtime environment variables.
 5. Prints the service URL.
 
@@ -88,8 +88,8 @@ permissions:
   id-token: write            # lets GitHub mint the OIDC token
 - uses: google-github-actions/auth@v2
   with:
-    workload_identity_provider: ${{ vars.WIF_PROVIDER }}
-    service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+    workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+    service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 ```
 
 GitHub presents a short-lived OIDC token bound to this repository, Google exchanges it for temporary credentials, and no key exists anywhere. The `id-token: write` permission is on the deploy job only. Do not reintroduce a service account key — the setup is documented in [`cloud/github-actions.md`](../../cloud/github-actions.md).

@@ -299,7 +299,7 @@ DATABASE_URL=postgresql+asyncpg://user:password@ep-xxx.us-east-2.aws.neon.tech/n
 |---|---|---|
 | Every push, every PR into `main` | `ci.yml` | Ruff lint + format check + pytest, and a Docker build + container smoke test |
 | PR into `main`, push to `main`, weekly | `codeql.yml` | CodeQL static security analysis (free — the repo is public) |
-| Push to `main` | `deploy.yml` | Builds Docker image, pushes to GCR, deploys to Cloud Run |
+| Push to `main` | `deploy.yml` | Builds Docker image, pushes to Artifact Registry, deploys to Cloud Run |
 
 The gate (`ci.yml` + `codeql.yml`) uses dummy secrets and SQLite — it never needs real credentials, so a fork's PR still runs. The three required checks are `Lint & Test`, `Docker image builds`, and `Analyze python`.
 
@@ -319,8 +319,7 @@ Click **Variables** → **New repository variable**:
 | `GCP_REGION` | `us-central1` | Cloud Run deployment region |
 | `CLOUD_RUN_SERVICE` | `anuvia` | Name of the Cloud Run service |
 | `APP_NAME` | `anuvia` | Application name passed to the container |
-| `WIF_PROVIDER` | `projects/NUMBER/locations/global/workloadIdentityPools/github-pool/providers/github-provider` | Workload Identity provider resource name |
-| `WIF_SERVICE_ACCOUNT` | `github-deployer@my-project-123.iam.gserviceaccount.com` | Deployer service account email |
+| `ARTIFACT_REPOSITORY` | `containers` | Artifact Registry repository name |
 
 #### Secrets (sensitive — masked in logs, never visible after saving)
 
@@ -328,12 +327,14 @@ Click **Secrets** → **New repository secret**:
 
 | Name | Description |
 |---|---|
+| `WIF_PROVIDER` | Workload Identity provider resource name (`projects/NUMBER/.../providers/github-provider`) |
+| `WIF_SERVICE_ACCOUNT` | Deployer service account email (`github-deployer@…iam.gserviceaccount.com`) |
 | `SECRET_KEY` | JWT signing secret — run `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `DATABASE_URL` | Your Neon connection string (copy from Neon dashboard → Connect → SQLAlchemy asyncpg) |
 | `STRIPE_SECRET_KEY` | Your Stripe secret key (optional — leave empty if not using payments) |
 | `STRIPE_WEBHOOK_SECRET` | Your Stripe webhook secret (optional) |
 
-There is **no** `GCP_SA_KEY` — the deploy authenticates without a key (see below).
+There is **no** `GCP_SA_KEY` — the deploy authenticates without a key (see below). The two `WIF_*` values are not truly sensitive; they are kept as secrets to match the `nextjs-cloudrun-template`. Variables would also work if `deploy.yml` reads `${{ vars.WIF_* }}`.
 
 ### Creating the GCP Service Account (keyless)
 
@@ -348,11 +349,16 @@ gcloud iam service-accounts create github-deployer \
   --display-name "GitHub Actions Deployer"
 
 # Grant required roles
-for ROLE in roles/run.admin roles/storage.admin roles/iam.serviceAccountUser; do
+for ROLE in roles/run.admin roles/artifactregistry.writer roles/iam.serviceAccountUser; do
   gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
     --member "serviceAccount:github-deployer@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
     --role "$ROLE"
 done
+
+# Create the Artifact Registry repo in the same region as Cloud Run
+gcloud artifacts repositories create containers \
+  --repository-format=docker --location=us-central1 \
+  --description="anuvia container images"
 ```
 
 Then set up Workload Identity Federation (pool, provider bound to your repo, and the impersonation binding) and read off the `WIF_PROVIDER` value. The full command set is in [`cloud/github-actions.md`](./cloud/github-actions.md).
@@ -364,7 +370,8 @@ Then set up Workload Identity Federation (pool, provider bound to your repo, and
 Enable the required GCP APIs (one time):
 
 ```bash
-gcloud services enable run.googleapis.com containerregistry.googleapis.com
+gcloud services enable run.googleapis.com artifactregistry.googleapis.com \
+  iamcredentials.googleapis.com sts.googleapis.com
 ```
 
 Push to `main`. The deploy workflow runs automatically. After the first deploy succeeds, Cloud Run creates the service and returns a public URL.
@@ -433,7 +440,7 @@ gh pr create --title "feat: my change" --body "What and why"
 gh pr merge --squash   # or merge via GitHub UI
 
 # 8. deploy.yml triggers automatically on the push-to-main from the merge
-#    → Docker image built, pushed to GCR, deployed to Cloud Run
+#    → Docker image built, pushed to Artifact Registry, deployed to Cloud Run
 ```
 
 The deploy only happens when the PR is merged — never on feature branches.
@@ -522,15 +529,15 @@ If you prefer to deploy manually without CI/CD:
 # Authenticate
 gcloud auth login
 gcloud config set project YOUR_PROJECT_ID
-gcloud auth configure-docker
+gcloud auth configure-docker us-central1-docker.pkg.dev
 
-# Build and push
-docker build -t gcr.io/YOUR_PROJECT_ID/anuvia:latest .
-docker push gcr.io/YOUR_PROJECT_ID/anuvia:latest
+# Build and push (Artifact Registry)
+docker build -t us-central1-docker.pkg.dev/YOUR_PROJECT_ID/containers/anuvia:latest .
+docker push us-central1-docker.pkg.dev/YOUR_PROJECT_ID/containers/anuvia:latest
 
 # Deploy
 gcloud run deploy anuvia \
-  --image gcr.io/YOUR_PROJECT_ID/anuvia:latest \
+  --image us-central1-docker.pkg.dev/YOUR_PROJECT_ID/containers/anuvia:latest \
   --region us-central1 \
   --platform managed \
   --allow-unauthenticated \

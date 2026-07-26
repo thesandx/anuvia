@@ -70,7 +70,7 @@ Rules:
 
 - **It runs only on `main`.** A feature branch never deploys. The deploy happens on the push that a merged pull request creates.
 - **It builds, tags with the commit SHA, pushes, and deploys the SHA tag.** The SHA tag is what makes a rollback a traffic shift. Do not deploy the `latest` tag to a revision — a revision pinned to a moving tag cannot be traced to a commit.
-- **Secrets come from GitHub, non-sensitive values from GitHub variables.** `vars.*` for the project id, region, service name, and the two `WIF_*` values. `secrets.*` for `SECRET_KEY` and `DATABASE_URL`.
+- **Secrets come from GitHub, non-sensitive values from GitHub variables.** `vars.*` for the project id, region, service name, and `ARTIFACT_REPOSITORY`. `secrets.*` for the two `WIF_*` values, `SECRET_KEY`, and `DATABASE_URL`.
 - **`permissions: contents: read` plus `id-token: write`.** The `id-token` scope lets GitHub mint the OIDC token for Workload Identity Federation. Keep it on the deploy job only — no other job needs it.
 
 ---

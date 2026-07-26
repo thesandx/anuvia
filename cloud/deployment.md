@@ -12,7 +12,14 @@ For the rules an assistant follows when changing the pipeline, see [`.github/ins
 
 ```bash
 gcloud config set project YOUR_PROJECT_ID
-gcloud services enable run.googleapis.com containerregistry.googleapis.com
+gcloud services enable run.googleapis.com artifactregistry.googleapis.com \
+  iamcredentials.googleapis.com sts.googleapis.com
+
+# Create the Artifact Registry repo in the SAME region as Cloud Run (us-central1).
+gcloud artifacts repositories create containers \
+  --repository-format=docker \
+  --location=us-central1 \
+  --description="anuvia container images"
 ```
 
 ### 2. Create the deploy service account
@@ -21,7 +28,7 @@ gcloud services enable run.googleapis.com containerregistry.googleapis.com
 gcloud iam service-accounts create github-deployer \
   --display-name "GitHub Actions Deployer"
 
-for ROLE in roles/run.admin roles/storage.admin roles/iam.serviceAccountUser; do
+for ROLE in roles/run.admin roles/artifactregistry.writer roles/iam.serviceAccountUser; do
   gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
     --member "serviceAccount:github-deployer@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
     --role "$ROLE"
@@ -46,19 +53,20 @@ Repository → Settings → Secrets and variables → Actions.
 | `GCP_REGION`          | `us-central1`  |
 | `CLOUD_RUN_SERVICE`   | `anuvia`       |
 | `APP_NAME`            | `anuvia`       |
-| `WIF_PROVIDER`        | `projects/NUMBER/locations/global/workloadIdentityPools/github-pool/providers/github-provider` |
-| `WIF_SERVICE_ACCOUNT` | `github-deployer@YOUR_PROJECT_ID.iam.gserviceaccount.com` |
+| `ARTIFACT_REPOSITORY` | `containers`   |
 
 **Secrets** (sensitive):
 
 | Name                    | Value                                              |
 | ----------------------- | -------------------------------------------------- |
+| `WIF_PROVIDER`          | `projects/NUMBER/locations/global/workloadIdentityPools/github-pool/providers/github-provider` |
+| `WIF_SERVICE_ACCOUNT`   | `github-deployer@YOUR_PROJECT_ID.iam.gserviceaccount.com` |
 | `SECRET_KEY`            | `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `DATABASE_URL`          | Neon `postgresql+asyncpg://...` (see the README)   |
 | `STRIPE_SECRET_KEY`     | Optional                                           |
 | `STRIPE_WEBHOOK_SECRET` | Optional                                           |
 
-There is no `GCP_SA_KEY` — the deploy is keyless.
+There is no `GCP_SA_KEY` — the deploy is keyless. The two `WIF_*` values are not truly sensitive (a resource path and an SA email); they are kept as secrets to mirror the `nextjs-cloudrun-template`. Plain variables would also work if `deploy.yml` reads `${{ vars.WIF_* }}`.
 
 ### 5. Enable branch protection on `main`
 
@@ -79,12 +87,13 @@ The deploy is automatic. Merging a pull request to `main` pushes to `main`, whic
 You do not deploy by hand in normal operation. To deploy manually (first bring-up, or a pipeline outage):
 
 ```bash
-gcloud auth configure-docker
-docker build -t gcr.io/YOUR_PROJECT_ID/anuvia:$(git rev-parse HEAD) .
-docker push gcr.io/YOUR_PROJECT_ID/anuvia:$(git rev-parse HEAD)
+gcloud auth configure-docker us-central1-docker.pkg.dev
+IMAGE=us-central1-docker.pkg.dev/YOUR_PROJECT_ID/containers/anuvia
+docker build -t $IMAGE:$(git rev-parse HEAD) .
+docker push $IMAGE:$(git rev-parse HEAD)
 
 gcloud run deploy anuvia \
-  --image gcr.io/YOUR_PROJECT_ID/anuvia:$(git rev-parse HEAD) \
+  --image $IMAGE:$(git rev-parse HEAD) \
   --region us-central1 --platform managed --allow-unauthenticated --port 8080 \
   --set-env-vars "APP_ENV=production,DEBUG=false,APP_NAME=anuvia" \
   --set-env-vars "SECRET_KEY=...,DATABASE_URL=postgresql+asyncpg://..."
@@ -146,9 +155,10 @@ Because each revision is tied to an immutable SHA-tagged image, you always know 
 ## First deploy checklist
 
 - [ ] APIs enabled.
+- [ ] Artifact Registry repo (`containers`) created in the Cloud Run region.
 - [ ] Deploy service account created with the three roles.
 - [ ] Workload Identity Federation pool, provider, and binding created; no key exists.
-- [ ] Variables (including `WIF_PROVIDER`, `WIF_SERVICE_ACCOUNT`) and secrets set in GitHub.
+- [ ] Variables (`ARTIFACT_REPOSITORY`, …) and secrets (`WIF_PROVIDER`, `WIF_SERVICE_ACCOUNT`, …) set in GitHub.
 - [ ] `SECRET_KEY` is at least 32 random characters.
 - [ ] `DATABASE_URL` is the Neon `postgresql+asyncpg://` form, no `sslmode` query parameter.
 - [ ] Neon project is in the same geography as `GCP_REGION`.
