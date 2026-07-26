@@ -65,7 +65,9 @@ repository or repositories, which `app/apps/<name>/` or `app/`/`components/`
 files, the data model and migrations, the API contract (routes, request and
 response schemas), the auth impact, external calls (async with timeouts), and
 the error paths. Call out any decision worth an ADR in `docs/adr/`. List the
-risks and trade-offs. → Wait for my sign-off.
+risks and trade-offs. For a data-heavy feature, design the schema with the
+dedicated [Database Design prompt](./db-design.md) before Phase 4.
+→ Wait for my sign-off.
 
 **Phase 3 — Backlog.** Break the design into epics → features → small stories.
 Each story has a title, acceptance criteria, the files it touches, and its test.
