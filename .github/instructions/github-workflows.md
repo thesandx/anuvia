@@ -70,8 +70,8 @@ Rules:
 
 - **It runs only on `main`.** A feature branch never deploys. The deploy happens on the push that a merged pull request creates.
 - **It builds, tags with the commit SHA, pushes, and deploys the SHA tag.** The SHA tag is what makes a rollback a traffic shift. Do not deploy the `latest` tag to a revision — a revision pinned to a moving tag cannot be traced to a commit.
-- **Secrets come from GitHub, non-sensitive values from GitHub variables.** `vars.*` for the project id, region, service name. `secrets.*` for `SECRET_KEY`, `DATABASE_URL`, and the GCP credential.
-- **`permissions: contents: read`.** The job needs no more. When you migrate to Workload Identity Federation, add `id-token: write` — and only then.
+- **Secrets come from GitHub, non-sensitive values from GitHub variables.** `vars.*` for the project id, region, service name, and the two `WIF_*` values. `secrets.*` for `SECRET_KEY` and `DATABASE_URL`.
+- **`permissions: contents: read` plus `id-token: write`.** The `id-token` scope lets GitHub mint the OIDC token for Workload Identity Federation. Keep it on the deploy job only — no other job needs it.
 
 ---
 
@@ -98,6 +98,6 @@ Rules:
 
 These are known gaps, not style choices. They are safe to leave for a low-traffic start and worth closing before real users:
 
-- **`deploy.yml` uses a service account key** (`GCP_SA_KEY`). Migrate to Workload Identity Federation — see [`cloud/github-actions.md`](../../cloud/github-actions.md).
+- **Done — keyless auth.** `deploy.yml` authenticates with Workload Identity Federation, not a service account key. See [`cloud/github-actions.md`](../../cloud/github-actions.md). Do not reintroduce a key.
 - **Secrets are passed as `--set-env-vars`**, which stores them in the revision. Migrate to Secret Manager with `--set-secrets` — see [`cloud/environment-variables.md`](../../cloud/environment-variables.md).
 - **`deploy.yml` runs the migration inside the container.** Move it to a deploy-time step before you scale to more than one instance — see [deployment.md](./deployment.md).

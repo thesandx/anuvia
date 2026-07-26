@@ -45,9 +45,9 @@ app.add_middleware(
 )
 ```
 
-### 2. The deploy uses a service account key
+### 2. The deploy uses a service account key — resolved
 
-`deploy.yml` authenticates with `GCP_SA_KEY`, a long-lived credential. **Fix:** migrate to Workload Identity Federation. See [`cloud/github-actions.md`](./cloud/github-actions.md).
+**Done.** `deploy.yml` now authenticates with Workload Identity Federation — a short-lived OIDC token bound to this repository, no stored key. Kept here for the record: do not reintroduce a service account key. See [`cloud/github-actions.md`](./cloud/github-actions.md).
 
 ### 3. Secrets are passed as environment variables at deploy
 
@@ -65,7 +65,7 @@ Not strictly a security issue, but a reliability one: concurrent instances race 
 - [ ] `SECRET_KEY` is at least 32 random characters, unique to production.
 - [ ] `DATABASE_URL` points to Neon (or Cloud SQL), never local SQLite.
 - [ ] CORS `allow_origins` is restricted to your real frontend (gap 1).
-- [ ] Deploy authenticates via Workload Identity Federation, not a key (gap 2).
+- [x] Deploy authenticates via Workload Identity Federation, not a key (gap 2).
 - [ ] Secrets come from Secret Manager, not `--set-env-vars` (gap 3).
 - [ ] Migrations run as a deploy-time step, not in the container `CMD` (gap 4).
 - [ ] Branch protection on `main` requires a pull request and the gate checks: `Lint & Test`, `Docker image builds`, and `Analyze python` (CodeQL).

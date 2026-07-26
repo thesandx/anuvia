@@ -1,35 +1,39 @@
 # GitHub Actions and the deploy credential
 
-How the pipeline authenticates to Google Cloud today, and the keyless path to harden it.
+How the pipeline authenticates to Google Cloud — keyless, with no stored credential.
 
 For the rules an assistant follows when editing a workflow, see [`.github/instructions/github-workflows.md`](../.github/instructions/github-workflows.md).
 
 ---
 
-## Today: a service account key
+## Today: keyless via Workload Identity Federation
 
-`deploy.yml` authenticates with a service account key stored as the `GCP_SA_KEY` secret:
+`deploy.yml` authenticates with a short-lived OIDC token. There is **no service account key** anywhere:
 
 ```yaml
-- id: auth
-  uses: google-github-actions/auth@v2
-  with:
-    credentials_json: ${{ secrets.GCP_SA_KEY }}
+permissions:
+  contents: read
+  id-token: write          # required to mint the OIDC token
+
+steps:
+  - id: auth
+    uses: google-github-actions/auth@v2
+    with:
+      workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+      service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
 ```
 
-This works. The cost is that the key is a **long-lived bearer credential**: whoever holds it can act as the service account until someone revokes it. A leaked key in a log, a fork, or a backup is valid indefinitely.
+GitHub presents a token that proves "this run is from `thesandx/anuvia`". Google exchanges it for temporary credentials scoped to the deployer service account. The token expires in minutes and cannot be reused elsewhere.
 
-While you use a key:
+> **History:** the pipeline used a `GCP_SA_KEY` secret before. A key is a long-lived bearer credential — valid until revoked if it leaks. It has been removed in favour of federation. Do not reintroduce a key.
 
-- Grant the account only the roles it needs: `roles/run.admin`, `roles/storage.admin` (or an Artifact Registry writer role), `roles/iam.serviceAccountUser`.
-- Never print it. Never interpolate it into a `run:` block — pass it only through the `with:` input.
-- Rotate it on any suspicion of exposure, and on a schedule.
+The deployer service account keeps only the roles it needs: `roles/run.admin`, `roles/storage.admin` (or an Artifact Registry writer role), and `roles/iam.serviceAccountUser`.
 
 ---
 
-## The hardening path: Workload Identity Federation
+## How it works, and the one-time setup
 
-Workload Identity Federation removes the key entirely. GitHub presents a short-lived OIDC token that proves "this run is from this repository". Google exchanges it for temporary credentials scoped to the deploy service account. No key exists anywhere.
+Workload Identity Federation needs no key. GitHub presents a short-lived OIDC token that proves "this run is from this repository". Google exchanges it for temporary credentials scoped to the deploy service account. No key exists anywhere.
 
 ### Set it up
 
@@ -54,23 +58,18 @@ gcloud iam service-accounts add-iam-policy-binding \
 
 The `attribute-condition` is the security boundary. It binds the credential to **this repository**, so no other repository can use the provider.
 
-### Change the workflow
+### The GitHub side (already wired in `deploy.yml`)
 
-```yaml
-permissions:
-  contents: read
-  id-token: write          # required for OIDC — add it only to this job
+`deploy.yml` reads two **variables** — not secrets, since neither is sensitive. Set them in Settings → Secrets and variables → Actions → Variables:
 
-steps:
-  - uses: actions/checkout@v4
-  - id: auth
-    uses: google-github-actions/auth@v2
-    with:
-      workload_identity_provider: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/providers/github-provider
-      service_account: github-deployer@YOUR_PROJECT_ID.iam.gserviceaccount.com
-```
+| Variable | Value |
+| --- | --- |
+| `WIF_PROVIDER` | the provider resource name from step 2 above (`projects/NUMBER/locations/global/workloadIdentityPools/github-pool/providers/github-provider`) |
+| `WIF_SERVICE_ACCOUNT` | the deployer email (`github-deployer@YOUR_PROJECT_ID.iam.gserviceaccount.com`) |
 
-Then delete the `GCP_SA_KEY` secret and the service account key.
+The job also declares `permissions: id-token: write`, which lets GitHub mint the OIDC token. That permission is on the deploy job only — keep it off every other job.
+
+Once a deploy succeeds with federation, delete the old `GCP_SA_KEY` secret and delete the service account key (`gcloud iam service-accounts keys delete`). No key should remain.
 
 ---
 

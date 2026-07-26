@@ -386,7 +386,7 @@ Full model and the hardening checklist are in [`SECURITY.md`](./SECURITY.md).
 - **No secret lives in the repository.** `.env`, `.env.docker`, and `*.db` are git-ignored. Secrets reach the app only through the environment: `.env` locally, GitHub Secrets → Cloud Run in production.
 - **Configuration is validated once, centrally.** Only `app/core/config.py` reads the environment. A missing required secret fails at startup.
 - **Passwords are bcrypt-hashed. Tokens are short-lived JWTs.** No plaintext password is ever stored or logged. `hashed_password` never leaves the server — response schemas exclude it.
-- **The current pipeline uses a service account key and passes secrets as env vars.** Both work and both are weaker than the target. The hardening path — Workload Identity Federation instead of a key, Secret Manager instead of `--set-env-vars` — is in [`SECURITY.md`](./SECURITY.md) and [`cloud/github-actions.md`](./cloud/github-actions.md). Do not add a new long-lived credential.
+- **The pipeline is keyless — Workload Identity Federation, no stored key.** Do not reintroduce a service account key. Secrets still pass as `--set-env-vars`, which is weaker than the target; the remaining hardening step is Secret Manager with `--set-secrets`. Both paths are in [`SECURITY.md`](./SECURITY.md) and [`cloud/github-actions.md`](./cloud/github-actions.md).
 - **CORS is open in the template and must be closed before production.** See [Trap 9](#trap-9).
 
 ---

@@ -28,18 +28,11 @@ for ROLE in roles/run.admin roles/storage.admin roles/iam.serviceAccountUser; do
 done
 ```
 
-### 3. Create the key (current pipeline) — or federate (hardening path)
+### 3. Set up keyless auth (Workload Identity Federation)
 
-The current pipeline uses a key. Create it, store it in GitHub, and delete the local copy:
+The pipeline authenticates with no key. Create a workload identity pool and a provider bound to this repository, then let the pool impersonate the deployer service account. The full command set — pool, provider, binding, and the resulting `WIF_PROVIDER` value — is in [github-actions.md](./github-actions.md).
 
-```bash
-gcloud iam service-accounts keys create key.json \
-  --iam-account github-deployer@YOUR_PROJECT_ID.iam.gserviceaccount.com
-# Paste the contents of key.json as the GitHub secret GCP_SA_KEY, then:
-rm key.json
-```
-
-The stronger option is Workload Identity Federation — no key at all. See [github-actions.md](./github-actions.md). Adopt it when you can; until then, treat `GCP_SA_KEY` as highly sensitive.
+Do **not** create a service account key. A key is a long-lived bearer credential; federation replaces it with a short-lived token.
 
 ### 4. Set GitHub variables and secrets
 
@@ -47,22 +40,25 @@ Repository → Settings → Secrets and variables → Actions.
 
 **Variables** (non-sensitive):
 
-| Name                | Example        |
-| ------------------- | -------------- |
-| `GCP_PROJECT_ID`    | `my-project-123` |
-| `GCP_REGION`        | `us-central1`  |
-| `CLOUD_RUN_SERVICE` | `anuvia`       |
-| `APP_NAME`          | `anuvia`       |
+| Name                  | Example        |
+| --------------------- | -------------- |
+| `GCP_PROJECT_ID`      | `my-project-123` |
+| `GCP_REGION`          | `us-central1`  |
+| `CLOUD_RUN_SERVICE`   | `anuvia`       |
+| `APP_NAME`            | `anuvia`       |
+| `WIF_PROVIDER`        | `projects/NUMBER/locations/global/workloadIdentityPools/github-pool/providers/github-provider` |
+| `WIF_SERVICE_ACCOUNT` | `github-deployer@YOUR_PROJECT_ID.iam.gserviceaccount.com` |
 
 **Secrets** (sensitive):
 
 | Name                    | Value                                              |
 | ----------------------- | -------------------------------------------------- |
-| `GCP_SA_KEY`            | Contents of `key.json`                             |
 | `SECRET_KEY`            | `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `DATABASE_URL`          | Neon `postgresql+asyncpg://...` (see the README)   |
 | `STRIPE_SECRET_KEY`     | Optional                                           |
 | `STRIPE_WEBHOOK_SECRET` | Optional                                           |
+
+There is no `GCP_SA_KEY` — the deploy is keyless.
 
 ### 5. Enable branch protection on `main`
 
@@ -151,8 +147,8 @@ Because each revision is tied to an immutable SHA-tagged image, you always know 
 
 - [ ] APIs enabled.
 - [ ] Deploy service account created with the three roles.
-- [ ] `GCP_SA_KEY` stored; local `key.json` deleted.
-- [ ] Variables and secrets set in GitHub.
+- [ ] Workload Identity Federation pool, provider, and binding created; no key exists.
+- [ ] Variables (including `WIF_PROVIDER`, `WIF_SERVICE_ACCOUNT`) and secrets set in GitHub.
 - [ ] `SECRET_KEY` is at least 32 random characters.
 - [ ] `DATABASE_URL` is the Neon `postgresql+asyncpg://` form, no `sslmode` query parameter.
 - [ ] Neon project is in the same geography as `GCP_REGION`.
