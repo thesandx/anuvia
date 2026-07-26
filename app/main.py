@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.router_loader import auto_register_routers
 from app.schemas.common import HealthResponse
+from app.utils.helpers import format_ist
 
 
 @asynccontextmanager
@@ -41,4 +42,8 @@ async def root():
 
 @app.get("/health", response_model=HealthResponse, tags=["system"])
 async def health():
-    return HealthResponse(status="ok", app=settings.APP_NAME)
+    return HealthResponse(
+        status="ok",
+        app=settings.APP_NAME,
+        deployed_at=format_ist(settings.DEPLOYED_AT),
+    )

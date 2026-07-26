@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
 
+    # Set by the deploy workflow to the UTC time of the deploy (ISO-8601).
+    # Empty in local development. Surfaced by /health, formatted in IST.
+    DEPLOYED_AT: str = ""
+
     @property
     def is_production(self) -> bool:
         return self.APP_ENV == "production"
