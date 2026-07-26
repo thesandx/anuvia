@@ -32,6 +32,7 @@ No secret is ever in the repository. `.env`, `.env.docker`, and `*.db` are git-i
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | No     | `30`                             | JWT lifetime in minutes.                  |
 | `STRIPE_SECRET_KEY`         | No       | `""`                             | Stripe integration.                       |
 | `STRIPE_WEBHOOK_SECRET`     | No       | `""`                             | Stripe webhook signature check.           |
+| `DEPLOYED_AT`               | No       | `""`                             | UTC deploy time (ISO-8601), set by the workflow. `/health` renders it in IST. |
 
 ---
 

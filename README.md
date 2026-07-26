@@ -490,7 +490,7 @@ This runs migrations against Neon first, then starts the server — identical to
 ### 5. Test it
 
 ```
-http://localhost:8080/health     → {"status": "ok", "app": "anuvia"}
+http://localhost:8080/health     → {"status": "ok", "app": "anuvia", "deployed_at": null}
 http://localhost:8080/docs       → Swagger UI (enabled because APP_ENV=development)
 http://localhost:8080/auth/register
 http://localhost:8080/auth/login

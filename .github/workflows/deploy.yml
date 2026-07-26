@@ -66,6 +66,9 @@ jobs:
 
       - name: Deploy to Cloud Run
         run: |
+          # UTC time of this deploy. /health renders it in IST so a deploy is
+          # visible without opening GitHub.
+          DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           gcloud run deploy $SERVICE \
             --image $IMAGE:${{ github.sha }} \
             --region $REGION \
@@ -75,6 +78,7 @@ jobs:
             --set-env-vars "APP_NAME=${{ vars.APP_NAME }}" \
             --set-env-vars "APP_ENV=production" \
             --set-env-vars "DEBUG=false" \
+            --set-env-vars "DEPLOYED_AT=${DEPLOYED_AT}" \
             --set-env-vars "SECRET_KEY=${{ secrets.SECRET_KEY }}" \
             --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" \
             --set-env-vars "STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}" \

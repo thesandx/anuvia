@@ -61,7 +61,7 @@ These versions are pinned in `requirements.txt` and are known to work together. 
 **Measured facts:**
 
 - The container runs `alembic upgrade head` and then starts Uvicorn on `$PORT`.
-- `/health` returns `{"status": "ok", "app": "anuvia"}`.
+- `/health` returns `{"status": "ok", "app": "anuvia", ...}`, including `deployed_at` — the last deploy time in IST, or `null` in local dev.
 - Tests run on in-memory SQLite. They need no `.env` and no network.
 - `docs` and `redoc` are disabled when `APP_ENV=production`.
 
