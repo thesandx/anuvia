@@ -55,7 +55,21 @@ The trap is `us-east1`: it reads like the match for `aws-us-east-1`, but it is i
 Corner, South Carolina — roughly 700 km from Ashburn, adding ~10 ms to every query.
 `us-east4` is the Ashburn region and the correct pairing.
 
-anuvia runs in **`us-east4`** because its Neon project is in `aws-us-east-1`.
+anuvia runs in **`us-central1`**, which is *not* co-located — its Neon project is in
+`aws-us-east-1`. The move to `us-east4` was attempted on 2026-09-09 and blocked, so read
+this before trying again:
+
+Cloud Run's `run.googleapis.com/max_regions` quota defaults to **3 regions per project**,
+and this project had already used `us-central1`, `asia-southeast1`, and `asia-south1`.
+The deploy authenticated, built, and pushed to a us-east4 Artifact Registry repo without
+trouble, then failed at `Creating Revision` with `ProjectInitFailedQuotaExceeded`.
+
+That quota counts regions the project has ever been **initialized** in, not regions
+currently holding resources. Emptying a region does not hand the slot back — this was
+tested by deleting the only asia-south1 workload, after which the quota still read 3 and
+the deploy failed identically. **Request the quota increase first**
+(IAM & Admin → Quotas → "Number of regions that Cloud Run has been used in"); do not try
+to free a slot by deleting things.
 
 ### Put the database in the same geography
 

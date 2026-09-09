@@ -316,7 +316,7 @@ Click **Variables** → **New repository variable**:
 | Name | Example value | Description |
 |---|---|---|
 | `GCP_PROJECT_ID` | `my-project-123` | Your Google Cloud project ID |
-| `GCP_REGION` | `us-east4` | Cloud Run deployment region |
+| `GCP_REGION` | `us-central1` | Cloud Run deployment region |
 | `CLOUD_RUN_SERVICE` | `anuvia` | Name of the Cloud Run service |
 | `APP_NAME` | `anuvia` | Application name passed to the container |
 | `ARTIFACT_REPOSITORY` | `containers` | Artifact Registry repository name |
@@ -357,7 +357,7 @@ done
 
 # Create the Artifact Registry repo in the same region as Cloud Run
 gcloud artifacts repositories create containers \
-  --repository-format=docker --location=us-east4 \
+  --repository-format=docker --location=us-central1 \
   --description="anuvia container images"
 ```
 
@@ -529,16 +529,16 @@ If you prefer to deploy manually without CI/CD:
 # Authenticate
 gcloud auth login
 gcloud config set project YOUR_PROJECT_ID
-gcloud auth configure-docker us-east4-docker.pkg.dev
+gcloud auth configure-docker us-central1-docker.pkg.dev
 
 # Build and push (Artifact Registry)
-docker build -t us-east4-docker.pkg.dev/YOUR_PROJECT_ID/containers/anuvia:latest .
-docker push us-east4-docker.pkg.dev/YOUR_PROJECT_ID/containers/anuvia:latest
+docker build -t us-central1-docker.pkg.dev/YOUR_PROJECT_ID/containers/anuvia:latest .
+docker push us-central1-docker.pkg.dev/YOUR_PROJECT_ID/containers/anuvia:latest
 
 # Deploy
 gcloud run deploy anuvia \
-  --image us-east4-docker.pkg.dev/YOUR_PROJECT_ID/containers/anuvia:latest \
-  --region us-east4 \
+  --image us-central1-docker.pkg.dev/YOUR_PROJECT_ID/containers/anuvia:latest \
+  --region us-central1 \
   --platform managed \
   --allow-unauthenticated \
   --port 8080 \

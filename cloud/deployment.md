@@ -15,10 +15,10 @@ gcloud config set project YOUR_PROJECT_ID
 gcloud services enable run.googleapis.com artifactregistry.googleapis.com \
   iamcredentials.googleapis.com sts.googleapis.com
 
-# Create the Artifact Registry repo in the SAME region as Cloud Run (us-east4).
+# Create the Artifact Registry repo in the SAME region as Cloud Run (us-central1).
 gcloud artifacts repositories create containers \
   --repository-format=docker \
-  --location=us-east4 \
+  --location=us-central1 \
   --description="anuvia container images"
 ```
 
@@ -50,7 +50,7 @@ Repository → Settings → Secrets and variables → Actions.
 | Name                  | Example        |
 | --------------------- | -------------- |
 | `GCP_PROJECT_ID`      | `my-project-123` |
-| `GCP_REGION`          | `us-east4`  |
+| `GCP_REGION`          | `us-central1`  |
 | `CLOUD_RUN_SERVICE`   | `anuvia`       |
 | `APP_NAME`            | `anuvia`       |
 | `ARTIFACT_REPOSITORY` | `containers`   |
@@ -87,14 +87,14 @@ The deploy is automatic. Merging a pull request to `main` pushes to `main`, whic
 You do not deploy by hand in normal operation. To deploy manually (first bring-up, or a pipeline outage):
 
 ```bash
-gcloud auth configure-docker us-east4-docker.pkg.dev
-IMAGE=us-east4-docker.pkg.dev/YOUR_PROJECT_ID/containers/anuvia
+gcloud auth configure-docker us-central1-docker.pkg.dev
+IMAGE=us-central1-docker.pkg.dev/YOUR_PROJECT_ID/containers/anuvia
 docker build -t $IMAGE:$(git rev-parse HEAD) .
 docker push $IMAGE:$(git rev-parse HEAD)
 
 gcloud run deploy anuvia \
   --image $IMAGE:$(git rev-parse HEAD) \
-  --region us-east4 --platform managed --allow-unauthenticated --port 8080 \
+  --region us-central1 --platform managed --allow-unauthenticated --port 8080 \
   --set-env-vars "APP_ENV=production,DEBUG=false,APP_NAME=anuvia" \
   --set-env-vars "SECRET_KEY=...,DATABASE_URL=postgresql+asyncpg://..."
 ```
@@ -120,7 +120,7 @@ Then deploy a service whose `CMD` only starts Uvicorn. Every migration must be b
 
 ```bash
 # The URL the deploy printed, or:
-gcloud run services describe anuvia --region us-east4 --format 'value(status.url)'
+gcloud run services describe anuvia --region us-central1 --format 'value(status.url)'
 
 curl https://YOUR_SERVICE_URL/health        # {"status":"ok","app":"anuvia"}
 ```
@@ -128,7 +128,7 @@ curl https://YOUR_SERVICE_URL/health        # {"status":"ok","app":"anuvia"}
 `/docs` returns 404 in production — that is correct (`APP_ENV=production`). Check the logs in Cloud Logging or:
 
 ```bash
-gcloud run services logs read anuvia --region us-east4 --limit 50
+gcloud run services logs read anuvia --region us-central1 --limit 50
 ```
 
 ---
@@ -139,11 +139,11 @@ A rollback is a traffic shift to an earlier revision. No rebuild.
 
 ```bash
 # List revisions, newest first
-gcloud run revisions list --service anuvia --region us-east4
+gcloud run revisions list --service anuvia --region us-central1
 
 # Send all traffic to a known-good revision
 gcloud run services update-traffic anuvia \
-  --region us-east4 --to-revisions anuvia-00042-abc=100
+  --region us-central1 --to-revisions anuvia-00042-abc=100
 ```
 
 Because each revision is tied to an immutable SHA-tagged image, you always know exactly which commit a revision runs.
