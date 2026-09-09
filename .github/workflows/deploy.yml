@@ -64,6 +64,30 @@ jobs:
           docker push $IMAGE:${{ github.sha }}
           docker push $IMAGE:latest
 
+      # Migrations run ONCE, here, against the production database — not in the
+      # container CMD. On boot every Cloud Run instance would run them and race
+      # on the same locks, and a bad migration would stop every instance from
+      # starting (a full outage) rather than failing this step (a failed deploy).
+      #
+      # It runs inside the image that is about to be deployed, so the migration
+      # executes with exactly the code and pinned dependencies of the new
+      # revision. -e VAR (no value) forwards the variable from the step env
+      # rather than putting the secret on the command line.
+      #
+      # This runs BEFORE the new revision exists, so the OLD revision serves
+      # traffic against the NEW schema for the length of the rollout. Every
+      # migration must therefore be backward compatible with the running
+      # revision: add a column before code reads it, and never drop a column
+      # the old revision still writes. See cloud/deployment.md.
+      - name: Run database migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        run: |
+          docker run --rm -e DATABASE_URL -e SECRET_KEY \
+            $IMAGE:${{ github.sha }} \
+            alembic upgrade head
+
       - name: Deploy to Cloud Run
         run: |
           # UTC time of this deploy. /health renders it in IST so a deploy is

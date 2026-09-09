@@ -81,7 +81,7 @@ Rejected. It makes latency worse, not better: a distant instance now pays the lo
 
 ## Prerequisites (fix before any multi-region step)
 
-1. **Move migrations out of the container start command.** Run `alembic upgrade head` once, as a deploy-time step, not in the `CMD`. Concurrent instances must not race on it, and every migration must be backward compatible with the running revision. See [`cloud/deployment.md`](../../cloud/deployment.md).
+1. ~~**Move migrations out of the container start command.**~~ **Done.** `deploy.yml` runs `alembic upgrade head` once, after the image push and before `gcloud run deploy`; the container `CMD` starts Uvicorn only. The standing obligation remains: every migration must be backward compatible with the running revision, because it applies while the old revision still serves. See [`cloud/deployment.md`](../../cloud/deployment.md).
 2. **Stop reading the user from the primary on every authenticated request.** `get_current_user` loads the user on each protected call. Across regions this is the call latency punishes most. Serve it from a local replica, or cache the user lookup (short TTL) so a distant request does not cross the world to authenticate.
 
 ## Revisit when

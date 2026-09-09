@@ -27,8 +27,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 ENV PORT=8080
-CMD alembic upgrade head && \
-    uvicorn app.main:app --host 0.0.0.0 --port ${PORT}
+CMD exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT}
 ```
 
 **Load-bearing lines — keep them:**
@@ -38,24 +37,48 @@ CMD alembic upgrade head && \
 - **`ENV PORT=8080`.** A default for local runs. Cloud Run replaces it at runtime.
 - **`COPY requirements.txt` before `COPY . .`.** This caches the dependency layer. Reorder it and every code change reinstalls every package.
 
-**The migration line is a known limitation.** `alembic upgrade head && uvicorn ...` runs the migration on every container start. It is fine for a single instance. It does not scale — see the next section.
+- **`exec`.** It replaces the shell, so Uvicorn runs as PID 1 and receives Cloud Run's `SIGTERM` directly. Without it the shell holds PID 1, swallows the signal, and the instance is killed instead of shutting down gracefully.
+
+**There is deliberately no migration in the `CMD`.** Do not add one back — see the next section.
 
 ---
 
-## Migrations at deploy time (the scaling fix)
+## Migrations at deploy time
 
-Running `alembic upgrade head` in the container `CMD` is the template's simple default. It has two problems at scale, and both matter before you add instances or regions:
+Migrations run **once**, in the `Run database migrations` step of `deploy.yml`, between the image push and `gcloud run deploy`:
 
-1. **Concurrency.** When Cloud Run runs several instances, each runs the migration on boot. They race for the same locks. One wins; the others may error or start against a half-migrated schema.
-2. **Coupling.** A failed migration keeps every instance from starting, so a bad migration is a full outage instead of a failed deploy step.
+```yaml
+- name: Run database migrations
+  env:
+    DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    SECRET_KEY: ${{ secrets.SECRET_KEY }}
+  run: |
+    docker run --rm -e DATABASE_URL -e SECRET_KEY \
+      $IMAGE:${{ github.sha }} \
+      alembic upgrade head
+```
 
-**The fix, before you scale out:** run the migration once, as a separate deploy step, and remove it from the container `CMD`.
+Why it is not in the container `CMD` — the two reasons, both of which bite before you add instances or regions:
 
-- Run it as a Cloud Run **job** (not the service), or as a step in `deploy.yml` before the `gcloud run deploy` line, against the production database.
-- Change the service `CMD` to `uvicorn app.main:app --host 0.0.0.0 --port ${PORT}` only.
-- A migration must be **backward compatible** with the currently running revision, because during a rollout old and new instances run at the same time. Add a column before you read it in code; do not drop a column the old revision still writes.
+1. **Concurrency.** When Cloud Run runs several instances, each would run the migration on boot. They race for the same locks. One wins; the others may error or start against a half-migrated schema.
+2. **Coupling.** A failed migration would keep every instance from starting, so a bad migration becomes a full outage instead of a failed deploy step.
 
-This change is tracked in [ADR-0003](../../docs/adr/0003-single-region-now-multi-region-later.md) as a prerequisite for multi-region.
+Why it runs **inside the image being deployed** rather than on the runner: the migration then executes with exactly the code and pinned dependencies of the new revision. A separate `pip install` on the runner can drift from what ships.
+
+Two rules this buys you, and one obligation:
+
+- The migration fails **before** any traffic moves, so a broken migration is a red deploy, not an outage.
+- The step is separately visible in the deploy log, with its own pass or fail.
+- **The obligation:** a migration must be **backward compatible** with the currently running revision. It lands while the *old* revision is still serving, and old and new instances overlap during the rollout. Add a column before you read it in code; do not drop a column the old revision still writes. Split a rename into add → backfill → switch reads → drop, across two deploys.
+
+This closes prerequisite 1 of [ADR-0003](../../docs/adr/0003-single-region-now-multi-region-later.md).
+
+**Local consequence:** running the image no longer creates the schema. Migrate first:
+
+```bash
+docker run --rm --env-file .env.docker anuvia alembic upgrade head
+docker run --env-file .env.docker -p 8080:8080 anuvia
+```
 
 ---
 

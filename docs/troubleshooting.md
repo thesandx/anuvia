@@ -61,11 +61,22 @@ Then run autogenerate again.
 
 **Fix:** `cp .env.example .env` and set `SECRET_KEY`.
 
+### A table is missing when running the Docker image locally
+
+**Cause:** the container `CMD` starts Uvicorn only — it does not migrate. That is deliberate (it is what stops Cloud Run instances racing on boot). A fresh database therefore has no schema, and any route that touches a table returns 500.
+
+**Fix:** migrate first, the same two steps the deploy runs:
+
+```bash
+docker run --rm --env-file .env.docker anuvia alembic upgrade head
+docker run --env-file .env.docker -p 8080:8080 anuvia
+```
+
 ### Migrations race or deadlock on Cloud Run
 
-**Cause:** the container `CMD` runs `alembic upgrade head` on every instance start. With more than one instance, they race.
+**Cause:** something reintroduced `alembic upgrade head` into the container `CMD`, so every instance migrates on boot and they race.
 
-**Fix:** move the migration to a single deploy-time step and remove it from the `CMD`. See [`.github/instructions/deployment.md`](../.github/instructions/deployment.md).
+**Fix:** take it back out. The migration belongs to the `Run database migrations` step in `deploy.yml`, which runs once per deploy. See [`.github/instructions/deployment.md`](../.github/instructions/deployment.md).
 
 ---
 
@@ -121,7 +132,7 @@ Then run autogenerate again.
 
 1. The server binds `localhost` instead of `0.0.0.0`. Keep `--host 0.0.0.0` in the `CMD`.
 2. The server ignores `$PORT`. Keep `--port ${PORT}`.
-3. The migration in the `CMD` failed, so the server never started. Check the logs for the Alembic error. Reproduce with the Docker-against-Neon run.
+3. The image fails to start for another reason — check the logs. Note the migration is **not** a possible cause here: it runs as its own `deploy.yml` step before the deploy, so a migration failure shows up as a failed deploy step, not a container that will not start. Reproduce with the Docker-against-Neon run.
 
 ### A secret value is visible in `gcloud run services describe`
 

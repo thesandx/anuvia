@@ -86,20 +86,19 @@ One region, app and database together, ~$0 on free tiers. This is the correct pr
 
 ---
 
-## Step 2 — fix the two blockers before adding any region
+## Step 2 — fix the remaining blocker before adding any region
 
-Two things in the current code break or slow down a multi-region setup. Fix them first.
+One of the two blockers is fixed. Fix the other before adding a region.
 
-### Blocker 1 — migrations run in the container start command
+### Blocker 1 — migrations run in the container start command — **fixed**
 
-The `Dockerfile` runs `alembic upgrade head && uvicorn ...`. With one instance it works. With several instances, or several regions, every instance runs the migration on boot and they race.
+**Done.** `deploy.yml` runs `alembic upgrade head` once, after the image push and before `gcloud run deploy` (Option A below), and the container `CMD` is `exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT}` only. Instances can no longer race on boot, so this no longer blocks adding instances or regions.
 
-**Fix:** run the migration once, as a deploy-time step, and remove it from the container `CMD`.
+Kept for the record, because the constraint it creates is permanent:
 
-- Option A: add a step to `deploy.yml` that runs `alembic upgrade head` against the production database **before** the `gcloud run deploy` line.
-- Option B: run it as a one-off Cloud Run **job** that shares the image, triggered before the service deploy.
-- Either way, change the service `CMD` to just `uvicorn app.main:app --host 0.0.0.0 --port ${PORT}`.
-- Every migration must be **backward compatible** with the currently running revision, because old and new instances overlap during a rollout. Add a column before code reads it; do not drop a column the old code still writes.
+- Option A (chosen): a step in `deploy.yml` that migrates **before** the `gcloud run deploy` line.
+- Option B: a one-off Cloud Run **job** sharing the image, triggered before the service deploy. Worth revisiting if the runner should ever stop holding the production `DATABASE_URL`.
+- Every migration must be **backward compatible** with the currently running revision, because old and new instances overlap during a rollout. Add a column before code reads it; do not drop a column the old code still writes. Across regions the overlap is longer, so this matters more, not less.
 
 ### Blocker 2 — the app reads the user on every authenticated request
 
@@ -179,7 +178,7 @@ Before you add a region, confirm all of these. If any is "no", you are not ready
 
 - [ ] The app and database are already co-located in one region (step 1 done).
 - [ ] You have **measured** latency (not guessed) and a distant user base is affected.
-- [ ] Migrations no longer run in the container `CMD` (blocker 1 fixed).
+- [x] Migrations no longer run in the container `CMD` (blocker 1 fixed).
 - [ ] The per-request user read is served locally or cached (blocker 2 fixed).
 - [ ] You accept the ~$18+/month load-balancer base cost plus replica cost.
 - [ ] Every read you will route to a replica tolerates a little staleness.

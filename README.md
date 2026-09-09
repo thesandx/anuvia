@@ -297,13 +297,21 @@ DATABASE_URL=postgresql+asyncpg://user:password@ep-xxx.us-east-2.aws.neon.tech/n
 
 | Trigger | Workflow | What it does |
 |---|---|---|
-| Every push, every PR into `main` | `ci.yml` | Ruff lint + format check + pytest, and a Docker build + container smoke test |
+| Every push, every PR into `main` | `ci.yml` | Ruff lint + format check + pytest, and a Docker build + container smoke test. On a PR, also applies the migrations to a throwaway Neon branch |
 | PR into `main`, push to `main`, weekly | `codeql.yml` | CodeQL static security analysis (free — the repo is public) |
 | Push to `main` | `deploy.yml` | Builds Docker image, pushes to Artifact Registry, deploys to Cloud Run |
 
 The gate (`ci.yml` + `codeql.yml`) uses dummy secrets and SQLite — it never needs real credentials, so a fork's PR still runs. The three required checks are `Lint & Test`, `Docker image builds`, and `Analyze python`.
 
-The deploy workflow reads real secrets from GitHub and injects them as Cloud Run environment variables at deploy time.
+The deploy workflow reads real secrets from GitHub and injects them as Cloud Run environment variables at deploy time. It also runs `alembic upgrade head` once, before the new revision goes live — the container itself does not migrate on boot.
+
+**Optional fourth check — `Migrations (Neon branch)`.** On a pull request it clones your Neon production branch (copy-on-write: same schema, same data, free while idle), applies the pull request's migrations to it, and deletes the branch afterwards. It catches a migration that breaks against the real PostgreSQL schema, which the SQLite tests cannot. It is not required and skips itself on forks and wherever Neon is not configured. To enable it, set:
+
+| Name | Kind | Value |
+|---|---|---|
+| `NEON_API_KEY` | Secret | A Neon API key (Neon console → Account settings → API keys) |
+| `NEON_PROJECT_ID` | Variable | Your Neon project ID (Neon console → Settings → General) |
+| `NEON_PRODUCTION_BRANCH` | Variable | Optional. Parent branch name; defaults to `production` |
 
 ### Setting up GitHub Secrets and Variables
 
@@ -424,8 +432,10 @@ git checkout -b feat/my-change
 
 # 2. Make your changes
 
-# 3. Test locally with Docker against Neon
-docker build -t anuvia . && docker run --env-file .env.docker -p 8080:8080 anuvia
+# 3. Test locally with Docker against Neon (migrate first — the CMD does not)
+docker build -t anuvia .
+docker run --rm --env-file .env.docker anuvia alembic upgrade head
+docker run --env-file .env.docker -p 8080:8080 anuvia
 # → http://localhost:8080/docs
 
 # 4. Push the branch
@@ -479,13 +489,14 @@ DATABASE_URL=postgresql+asyncpg://user:password@ep-xxx.us-east-2.aws.neon.tech/n
 docker build -t anuvia .
 ```
 
-### 4. Run it
+### 4. Migrate, then run it
 
 ```bash
+docker run --rm --env-file .env.docker anuvia alembic upgrade head
 docker run --env-file .env.docker -p 8080:8080 anuvia
 ```
 
-This runs migrations against Neon first, then starts the server — identical to what Cloud Run does. Logs stream directly to your terminal.
+Two commands, because that is exactly what the deploy does: migrate once, then serve. The container `CMD` starts Uvicorn only — migrations belong to the `Run database migrations` step in `deploy.yml`, so that Cloud Run instances cannot race on them at boot. Skip the first command against a fresh database and any route touching a table returns 500. Logs stream directly to your terminal.
 
 ### 5. Test it
 
@@ -499,7 +510,6 @@ http://localhost:8080/auth/login
 ### What you'll see in the terminal logs
 
 ```
-INFO     Running migrations...
 INFO     Application startup complete.
 INFO     2024-01-01 12:00:00 - SELECT users.id ... (SQL echo from DEBUG=true)
 INFO     127.0.0.1:12345 - "POST /auth/login HTTP/1.1" 200

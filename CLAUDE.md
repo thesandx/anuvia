@@ -60,7 +60,7 @@ These versions are pinned in `requirements.txt` and are known to work together. 
 
 **Measured facts:**
 
-- The container runs `alembic upgrade head` and then starts Uvicorn on `$PORT`.
+- The container starts Uvicorn on `$PORT` and nothing else. Migrations run once, as a deploy-time step in `deploy.yml`, before the new revision is deployed — see [Trap 6](#trap-6).
 - `/health` returns `{"status": "ok", "app": "anuvia", ...}`, including `deployed_at` — the last deploy time in IST, or `null` in local dev.
 - Tests run on in-memory SQLite. They need no `.env` and no network.
 - `docs` and `redoc` are disabled when `APP_ENV=production`.
@@ -216,10 +216,11 @@ The pattern is **one write primary, read replicas near users**. Writes always go
 
 **4. Go multi-region only when a real, distant user base has a real latency problem.** For a solo developer on a small budget, premature multi-region buys cost and complexity, not speed. The trigger to revisit is in the ADR: measured latency complaints from a region far from your primary, not a guess about future scale.
 
-**Two things block a clean multi-region setup today. Fix them first** (both are [traps](#trap-6) and are tracked in the ADR):
+**One thing still blocks a clean multi-region setup. Fix it first** (it is tracked in the ADR):
 
-- Migrations run in the container start command. With many instances or many regions, they race on boot. Move migrations to a single deploy-time step.
 - The app hits the database on every authenticated request to load the user. Across regions this is the exact call you must serve locally or cache.
+
+The other blocker is **fixed**: migrations no longer run in the container start command, so instances cannot race on boot. `deploy.yml` runs `alembic upgrade head` once, before the new revision deploys. See [Trap 6](#trap-6).
 
 ---
 
@@ -249,7 +250,12 @@ Every item here reflects real behaviour of this stack. Do not "fix" any of them 
 
 ### Trap 6
 
-**Migrations run in the container `CMD`, and that does not scale.** The `Dockerfile` runs `alembic upgrade head && uvicorn ...`. It works for one instance. With Cloud Run running several instances, or with more than one region, every instance runs migrations on boot and they race. This is a real limitation, documented in [ADR-0003](./docs/adr/0003-single-region-now-multi-region-later.md). Before you scale out, move migrations to a single deploy-time step (see [`cloud/deployment.md`](./cloud/deployment.md)). Do not "fix" it by adding retries.
+**The `Dockerfile` does not run migrations, and that is deliberate.** The `CMD` is `uvicorn ...` alone. This looks like a missing step — it is not. Migrations run **once**, in the `Run database migrations` step of `deploy.yml`, before `gcloud run deploy`. Running them in the `CMD` means every Cloud Run instance runs them on boot and they race for the same locks, and a bad migration stops every instance from starting — a full outage instead of a failed deploy step. Do not add `alembic upgrade head &&` back to the `CMD`.
+
+Two consequences you own in exchange:
+
+- **Every migration must be backward compatible with the running revision.** The migration lands while the *old* revision is still serving. Add a column before code reads it; never drop a column the old revision still writes.
+- **Running the image locally no longer creates the schema.** Run `alembic upgrade head` yourself first — see [Verification protocol](#verification-protocol).
 
 ### Trap 7
 
@@ -328,7 +334,7 @@ Missing any step breaks somebody:
 ### Change the Dockerfile
 
 1. Read [`.github/instructions/deployment.md`](./.github/instructions/deployment.md) first.
-2. Keep: `$PORT` honoured, `--host 0.0.0.0`, the migration step (until it moves to deploy-time — see [Trap 6](#trap-6)).
+2. Keep: `$PORT` honoured, `--host 0.0.0.0`, and **no** migration in the `CMD` — it belongs to `deploy.yml` (see [Trap 6](#trap-6)).
 3. **Verify**: `docker build -t anuvia . && docker run --env-file .env.docker -p 8080:8080 anuvia`, then `curl localhost:8080/health`.
 
 ---
@@ -355,6 +361,9 @@ If you touched the `Dockerfile`, `requirements.txt`, migrations, or the env mode
 
 ```bash
 docker build -t anuvia .
+# The CMD no longer migrates (Trap 6), so migrate first — the same two steps,
+# in the same order, that deploy.yml runs.
+docker run --rm --env-file .env.docker anuvia alembic upgrade head
 docker run --env-file .env.docker -p 8080:8080 anuvia
 curl localhost:8080/health          # must return {"status":"ok","app":"anuvia"}
 ```
@@ -368,6 +377,8 @@ alembic upgrade head
 ```
 
 If you touched a workflow: YAML that parses is not a workflow that runs. The gate is `ci.yml` (job `Lint & Test` plus `Docker image builds`) and `codeql.yml` (job `Analyze python`); `deploy.yml` only runs on `main`. All three gate checks must be green before a merge — see [`.github/instructions/github-workflows.md`](./.github/instructions/github-workflows.md).
+
+`ci.yml` has a fourth job, `Migrations (Neon branch)`, which clones the production Neon branch and applies the pull request's migrations to it. It is **not** a required check: it skips itself on forks and where Neon is unconfigured, because it is the one job that needs a credential.
 
 ---
 

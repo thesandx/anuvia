@@ -8,13 +8,21 @@ Read this before you touch anything in `.github/workflows/`.
 
 | File          | Trigger                              | Purpose                                          |
 | ------------- | ------------------------------------ | ------------------------------------------------ |
-| `ci.yml`      | Every push, every pull request into `main`, manual | Lint, format check, test, and a Docker build + smoke test. |
+| `ci.yml`      | Every push, every pull request into `main`, manual | Lint, format check, test, a Docker build + smoke test, and (pull requests only) a migration check on a throwaway Neon branch. |
 | `codeql.yml`  | Pull request into `main`, push to `main`, weekly, manual | Static security analysis (CodeQL). |
 | `deploy.yml`  | Push to `main`                       | Build the image, push it, deploy to Cloud Run.   |
 
 `ci.yml` and `codeql.yml` are the pre-merge gate. `deploy.yml` is the release. They never overlap: the gate needs no cloud credentials, and deploy runs only after a merge to `main`.
 
 The gate has **three required checks**: `Lint & Test`, `Docker image builds`, and `Analyze python`. Require all three in branch protection. See [`cloud/deployment.md`](../../cloud/deployment.md).
+
+`Migrations (Neon branch)` is a fourth job and is deliberately **not** required — it is the only job needing a credential, so it cannot run on a fork. Requiring it would block every fork's pull request.
+
+---
+
+## deploy.yml runs the migrations
+
+`deploy.yml` runs `alembic upgrade head` once, after the image push and before `gcloud run deploy`. The container `CMD` does not migrate. Do not move it back — see [`deployment.md`](./deployment.md).
 
 ---
 
@@ -33,12 +41,22 @@ Two jobs run in parallel.
 **Job `docker` (`Docker image builds`)** — proves the production image works:
 
 - Builds the real image with Buildx and the GitHub Actions cache. Nothing is pushed.
-- Boots the container and polls `/health` until it answers. This catches what a build alone cannot: the app failing to start, migrations failing on boot, binding to `localhost` instead of `0.0.0.0`, or ignoring `$PORT`.
-- The container uses its default SQLite database, so the smoke test needs no external database — the same choice the unit tests make.
+- Runs the same two steps production runs, in the same order: `alembic upgrade head` in a throwaway container, then the server. Both share a volume so the server sees the migrated database. This mirrors the deploy sequence rather than a sequence only CI uses.
+- Polls `/health` until it answers. This catches what a build alone cannot: the app failing to start, binding to `localhost` instead of `0.0.0.0`, or ignoring `$PORT`.
+- SQLite keeps the job free of any external database — the same choice the unit tests make.
+
+**Job `migrations` (`Migrations (Neon branch)`)** — proves the migrations apply to the *real* production schema:
+
+- Creates a Neon branch from the production branch. A Neon branch is a copy-on-write clone: same schema, same data, made in seconds, free while idle.
+- Runs `alembic upgrade head` against it. This is the check SQLite cannot give: it applies the pull request's migration to a copy of production, on PostgreSQL.
+- If the pull request **adds** migration files, it also rolls them back and reapplies them. It counts the added files with `git diff --diff-filter=A` against the base branch, so it never rolls back a migration that is already in production — a check that fails on unrelated pull requests is one people learn to ignore.
+- Deletes the branch with `if: always()`, so a failed migration leaves nothing behind.
+- Skips itself unless the run is a pull request from this repository (not a fork) and `vars.NEON_PROJECT_ID` is set. A skipped job reports success, so forks are never blocked.
+- Needs `NEON_API_KEY` (secret) and `NEON_PROJECT_ID` (variable); `NEON_PRODUCTION_BRANCH` (variable) overrides the `production` parent branch name.
 
 Rules:
 
-- **The gate uses dummy secrets and SQLite.** The `SECRET_KEY` and `DATABASE_URL` are throwaway values. The gate never needs a real credential. Keep it that way — it is what lets a fork's pull request run.
+- **The two required jobs use dummy secrets and SQLite.** Their `SECRET_KEY` and `DATABASE_URL` are throwaway values, so they never need a real credential. Keep it that way — it is what lets a fork's pull request run. `Migrations (Neon branch)` is the deliberate exception, and it skips rather than fails when the credential is absent.
 - **The `test` steps match the local gate.** If `ruff check`, `ruff format --check`, and `pytest` pass locally, they pass in CI. If they do not, your local environment differs from `requirements.txt`.
 - **The job names are `Lint & Test` and `Docker image builds`.** Branch protection requires these exact names. If you rename a job, update the branch protection rule.
 - **`permissions: contents: read` and `concurrency` cancel-in-progress.** The gate only reads the repository, and a new push cancels the superseded run.

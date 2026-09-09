@@ -132,7 +132,8 @@ pytest tests/ -v
 
 CI adds two checks you cannot fully reproduce with one command, both on every pull request:
 
-- **`Docker image builds`** — builds the production image and smoke-tests `/health` in the running container. Reproduce it locally with `docker build -t anuvia . && docker run -e SECRET_KEY=x -p 8080:8080 anuvia`, then `curl localhost:8080/health`.
+- **`Docker image builds`** — builds the production image, migrates a throwaway SQLite database, starts the container, and smoke-tests `/health`. Reproduce it locally with `docker build -t anuvia . && docker run -e SECRET_KEY=x -p 8080:8080 anuvia`, then `curl localhost:8080/health`.
+- **`Migrations (Neon branch)`** — pull requests only, and not a required check. Clones the production Neon branch and runs `alembic upgrade head` against it, so a migration is tested on real PostgreSQL with the real schema. If the pull request adds migrations, it rolls them back and reapplies them too. Skipped on forks and where Neon is unconfigured.
 - **`Analyze python`** — CodeQL static security analysis (`codeql.yml`). It runs in GitHub, not locally; read its findings in the repository Security tab.
 
 Run all three before you call the work done. A green `pytest` with a failing `ruff` still fails CI.
