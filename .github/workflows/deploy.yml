@@ -6,7 +6,7 @@ on:
 
 # GitHub Variables (Settings → Secrets and variables → Variables):
 #   GCP_PROJECT_ID       — your Google Cloud project ID
-#   GCP_REGION           — e.g. us-central1
+#   GCP_REGION           — e.g. us-east4 (co-located with the Neon DB)
 #   CLOUD_RUN_SERVICE    — e.g. anuvia
 #   APP_NAME             — e.g. anuvia
 #   ARTIFACT_REPOSITORY  — Artifact Registry repo name, e.g. containers
