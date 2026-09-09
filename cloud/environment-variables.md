@@ -58,7 +58,7 @@ This app has **no** build-time public configuration. There is no equivalent of a
 This works, and it stores the value in the Cloud Run revision. Anyone with `roles/run.viewer` can read it:
 
 ```bash
-gcloud run services describe anuvia --region us-east4 --format export
+gcloud run services describe anuvia --region us-central1 --format export
 ```
 
 **The hardening path** is Secret Manager. Store the secret once, grant the runtime service account access, and reference it by name at deploy:
