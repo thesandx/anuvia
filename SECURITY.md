@@ -53,9 +53,9 @@ app.add_middleware(
 
 `--set-env-vars` stores the value in the Cloud Run revision, readable by anyone with `roles/run.viewer`. **Fix:** move secrets to Secret Manager and reference them with `--set-secrets`. See [`cloud/environment-variables.md`](./cloud/environment-variables.md).
 
-### 4. Migrations run in the container start command
+### 4. Migrations run in the container start command — resolved
 
-Not strictly a security issue, but a reliability one: concurrent instances race on boot. **Fix:** run migrations as a deploy-time step. See [`cloud/deployment.md`](./cloud/deployment.md).
+**Done.** `deploy.yml` runs `alembic upgrade head` once, before `gcloud run deploy`; the container `CMD` starts Uvicorn only, so concurrent instances cannot race on boot. Kept here for the record: do not move the migration back into the `CMD`. See [`cloud/deployment.md`](./cloud/deployment.md).
 
 ---
 
@@ -67,7 +67,7 @@ Not strictly a security issue, but a reliability one: concurrent instances race 
 - [ ] CORS `allow_origins` is restricted to your real frontend (gap 1).
 - [x] Deploy authenticates via Workload Identity Federation, not a key (gap 2).
 - [ ] Secrets come from Secret Manager, not `--set-env-vars` (gap 3).
-- [ ] Migrations run as a deploy-time step, not in the container `CMD` (gap 4).
+- [x] Migrations run as a deploy-time step, not in the container `CMD` (gap 4).
 - [ ] Branch protection on `main` requires a pull request and the gate checks: `Lint & Test`, `Docker image builds`, and `Analyze python` (CodeQL).
 - [ ] Any AI or payment provider key is a secret, never in source or a `NEXT_PUBLIC`-style public value.
 - [ ] Logs contain no token, password, or full connection string.

@@ -2,8 +2,14 @@ name: CI
 
 # The pre-merge gate. Runs on every pull request into main, on direct pushes
 # to main as a safety net, and on any branch push for fast feedback. Nothing
-# here touches Google Cloud, so the job needs no cloud credentials — keep it
+# here touches Google Cloud, so the jobs need no cloud credentials — keep it
 # that way so a fork's pull request still runs.
+#
+# `Lint & Test` and `Docker image builds` run everywhere, on SQLite, with no
+# external service. `Migrations (Neon branch)` is the one job that reaches out:
+# it needs Neon credentials, so it skips itself on forks and on repositories
+# that have not configured Neon. It must stay optional for that reason — see
+# .github/instructions/github-workflows.md.
 on:
   push:
     branches: ["**"]
@@ -81,18 +87,34 @@ jobs:
 
       - name: Smoke test the container
         # Boots the real image and waits for /health. Catches the failures a
-        # build alone cannot: the app failing to start, migrations failing on
-        # boot, binding to localhost instead of 0.0.0.0, or ignoring $PORT.
-        # The container uses its default SQLite database, so the smoke test
-        # needs no external database — the same choice the unit tests make.
+        # build alone cannot: the app failing to start, binding to localhost
+        # instead of 0.0.0.0, or ignoring $PORT.
+        #
+        # This runs the same two steps production runs, in the same order:
+        # migrate once with a throwaway container, then start the server. The
+        # image CMD no longer migrates (see the Dockerfile), so the migration
+        # is an explicit `docker run ... alembic upgrade head` that overrides
+        # it. Both containers share a volume so the server sees the migrated
+        # database. SQLite keeps the job free of any external database — the
+        # same choice the unit tests make.
         run: |
           set -euo pipefail
           IMAGE="anuvia:ci-${{ github.sha }}"
-          docker run -d --name smoke -p 8080:8080 \
+          DATA_DIR="${RUNNER_TEMP}/smoke"
+          mkdir -p "$DATA_DIR"
+
+          # Step 1 — migrate (the deploy-time step, run locally).
+          docker run --rm -v "${DATA_DIR}:/data" \
+            -e SECRET_KEY=ci-smoke-secret-not-used-in-production \
+            -e DATABASE_URL="sqlite+aiosqlite:////data/smoke.db" \
+            "$IMAGE" alembic upgrade head
+
+          # Step 2 — serve, against the schema step 1 created.
+          docker run -d --name smoke -p 8080:8080 -v "${DATA_DIR}:/data" \
             -e PORT=8080 \
             -e APP_ENV=production \
             -e SECRET_KEY=ci-smoke-secret-not-used-in-production \
-            -e DATABASE_URL="sqlite+aiosqlite:////app/smoke.db" \
+            -e DATABASE_URL="sqlite+aiosqlite:////data/smoke.db" \
             "$IMAGE"
 
           for attempt in $(seq 1 30); do
@@ -109,3 +131,105 @@ jobs:
           docker logs smoke
           docker rm -f smoke > /dev/null
           exit 1
+
+  migrations:
+    name: Migrations (Neon branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Skipped unless all three hold:
+    #   - this is a pull request (the branch is named after the PR),
+    #   - it comes from this repository, not a fork (forks get no secrets),
+    #   - Neon is configured (NEON_PROJECT_ID variable is set).
+    # A skipped job reports as success, so a fork's pull request is not blocked.
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      vars.NEON_PROJECT_ID != ''
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          # Full history so the diff against the base branch can find newly
+          # added migration files.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # A Neon branch is a copy-on-write clone of the production branch: same
+      # schema, same data, created in seconds and costing nothing while idle.
+      # Running the migration against it is the check SQLite cannot give us —
+      # it proves the new migration applies to the REAL production schema.
+      - name: Create a Neon branch for this pull request
+        id: neon_branch
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          parent_branch: ${{ vars.NEON_PRODUCTION_BRANCH || 'production' }}
+          branch_name: ci-pr-${{ github.event.number }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      # BASE_REF goes through env, never spliced into the shell: a branch name
+      # is user-controlled text, and ${{ }} is substituted into the command
+      # source before it runs. Same rule as a secret.
+      - name: Count migrations added by this pull request
+        id: added
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          COUNT=$(git diff --name-only --diff-filter=A \
+            "origin/${BASE_REF}...HEAD" -- alembic/versions/ \
+            | grep -c '\.py$' || true)
+          echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
+          echo "This pull request adds ${COUNT} migration(s)."
+
+      # Neon hands out postgresql://...?sslmode=require&channel_binding=require.
+      # asyncpg rejects both query parameters and needs the +asyncpg scheme, so
+      # convert exactly as a human would for .env (see docs/troubleshooting.md).
+      # The URL holds a password: it is built and used without ever being echoed.
+      - name: Apply migrations to the branch
+        env:
+          NEON_DB_URL: ${{ steps.neon_branch.outputs.db_url }}
+          SECRET_KEY: ci-migration-secret-not-used-in-production
+        run: |
+          set -euo pipefail
+          ASYNC_URL="postgresql+asyncpg://${NEON_DB_URL#*://}"
+          DATABASE_URL="${ASYNC_URL%%\?*}" alembic upgrade head
+          echo "alembic upgrade head succeeded against the branch."
+
+      # Only when this pull request adds migrations. Rolling back a migration
+      # that is already in production would fail every unrelated pull request
+      # whose ancestor has an unwritten downgrade, and a check people learn to
+      # ignore is worse than no check.
+      - name: Verify the new migrations roll back and reapply
+        if: steps.added.outputs.count != '0'
+        env:
+          NEON_DB_URL: ${{ steps.neon_branch.outputs.db_url }}
+          SECRET_KEY: ci-migration-secret-not-used-in-production
+          ADDED_COUNT: ${{ steps.added.outputs.count }}
+        run: |
+          set -euo pipefail
+          ASYNC_URL="postgresql+asyncpg://${NEON_DB_URL#*://}"
+          export DATABASE_URL="${ASYNC_URL%%\?*}"
+          alembic downgrade "-${ADDED_COUNT}"
+          alembic upgrade head
+          echo "Rollback and reapply succeeded."
+
+      # always(): the branch is deleted even when a step above failed, so a
+      # broken migration does not leave branches behind. Neon's free tier caps
+      # how many can exist at once.
+      - name: Delete the Neon branch
+        if: always()
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch: ci-pr-${{ github.event.number }}
+          api_key: ${{ secrets.NEON_API_KEY }}

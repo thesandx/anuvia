@@ -105,14 +105,27 @@ Deploy the SHA tag, never `latest`. A revision pinned to a moving tag cannot be 
 
 ## Migrations
 
-Today the container runs `alembic upgrade head` on start. For a single instance this is fine. **Before you run more than one instance or add a region, move the migration to a deploy-time step** and remove it from the container `CMD`:
+Migrations run **once per deploy**, as the `Run database migrations` step in `deploy.yml`, after the image is pushed and before `gcloud run deploy`. The container `CMD` starts Uvicorn only — it does not migrate.
+
+The step runs `alembic upgrade head` inside the image being deployed, so the migration uses exactly the code and pinned dependencies of the new revision:
 
 ```bash
-# Run once against the production database, before deploying the new revision
+docker run --rm -e DATABASE_URL -e SECRET_KEY "$IMAGE:$SHA" alembic upgrade head
+```
+
+**What this means when you operate it:**
+
+- A failed migration is a **failed deploy**, not an outage. The step fails before any traffic shifts, and the previous revision keeps serving.
+- Every migration must be **backward compatible with the running revision**. It applies while the old revision is still serving, and old and new instances overlap during the rollout. Add a column before code reads it; never drop a column the old revision still writes. Split a rename into add → backfill → switch reads → drop, across two deploys.
+- **A rollback does not undo a migration.** See "Rolling back" below.
+
+To run a migration by hand against production (recovery, or a migration you want to apply out of band):
+
+```bash
 DATABASE_URL="postgresql+asyncpg://..." alembic upgrade head
 ```
 
-Then deploy a service whose `CMD` only starts Uvicorn. Every migration must be backward compatible with the running revision, because old and new instances overlap during the rollout. See [ADR-0003](../docs/adr/0003-single-region-now-multi-region-later.md).
+Pull requests get an automatic check: `ci.yml`'s `Migrations (Neon branch)` job clones the production Neon branch and applies the pull request's migrations to it, so a migration that breaks against the real schema fails review rather than the deploy. See [ADR-0003](../docs/adr/0003-single-region-now-multi-region-later.md).
 
 ---
 
@@ -163,5 +176,6 @@ Because each revision is tied to an immutable SHA-tagged image, you always know 
 - [ ] `DATABASE_URL` is the Neon `postgresql+asyncpg://` form, no `sslmode` query parameter.
 - [ ] Neon project is in the same geography as `GCP_REGION`.
 - [ ] Branch protection on `main` requires `Lint & Test`, `Docker image builds`, and `Analyze python`.
+- [ ] *(Optional)* `NEON_API_KEY` secret and `NEON_PROJECT_ID` variable set, so pull requests test migrations against a Neon branch.
 - [ ] CORS origins restricted to your real frontend (before real users) — see [SECURITY.md](../SECURITY.md).
 - [ ] A budget alert is set.

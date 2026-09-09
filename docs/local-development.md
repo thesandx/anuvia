@@ -130,10 +130,11 @@ Use this to catch problems the SQLite path hides: a PostgreSQL-only migration er
 cp .env.docker.example .env.docker      # git-ignored; fill in real values
 # set SECRET_KEY and a real Neon DATABASE_URL
 docker build -t anuvia .
+docker run --rm --env-file .env.docker anuvia alembic upgrade head
 docker run --env-file .env.docker -p 8080:8080 anuvia
 ```
 
-This runs the migration against Neon, then starts the server — the exact sequence Cloud Run runs. Every request and every SQL query prints to the terminal when `DEBUG=true`.
+Two commands, because that is the exact sequence the deploy runs: migrate once, then serve. The container `CMD` does not migrate — `deploy.yml` does, before the new revision goes live. Skip the first command against a fresh database and every route that touches a table returns 500. Every request and every SQL query prints to the terminal when `DEBUG=true`.
 
 ---
 

@@ -34,6 +34,16 @@ No secret is ever in the repository. `.env`, `.env.docker`, and `*.db` are git-i
 | `STRIPE_WEBHOOK_SECRET`     | No       | `""`                             | Stripe webhook signature check.           |
 | `DEPLOYED_AT`               | No       | `""`                             | UTC deploy time (ISO-8601), set by the workflow. `/health` renders it in IST. |
 
+All of the above are read by `app/core/config.py`. The workflows also use a few values that never reach the app:
+
+| Name | Kind | Used by | Purpose |
+| --- | --- | --- | --- |
+| `NEON_API_KEY` | Secret | `ci.yml` | Creates and deletes the per-pull-request Neon branch. Optional — the job skips without it. |
+| `NEON_PROJECT_ID` | Variable | `ci.yml` | The Neon project to branch from. Its presence is what enables the job. |
+| `NEON_PRODUCTION_BRANCH` | Variable | `ci.yml` | Parent branch to clone. Defaults to `production`. |
+
+These are **not** `Settings` fields and must not be added to `app/core/config.py` — the app never reads them.
+
 ---
 
 ## Build-time vs runtime
