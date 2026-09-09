@@ -75,6 +75,7 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --port 8080 \
+            --max-instances 3 \
             --set-env-vars "APP_NAME=${{ vars.APP_NAME }}" \
             --set-env-vars "APP_ENV=production" \
             --set-env-vars "DEBUG=false" \
