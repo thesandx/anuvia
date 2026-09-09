@@ -37,7 +37,25 @@ Every one of those database calls is a round trip. If the app is in one region a
 
 ### Pick the region
 
-Choose the region closest to most of your users. If you do not know, pick a central one (`us-central1`, or a European or Asian region for those audiences).
+Pick the Google Cloud region that sits in the **same metro as your database**, not the
+one closest to your users. The app-to-database round trip dominates, and users reach the
+app over a single connection while the app queries the database several times per request.
+
+Neon runs on AWS, so the region names do not line up with Google's. Match by city:
+
+| Neon (AWS)       | City                    | Google Cloud region |
+| ---------------- | ----------------------- | ------------------- |
+| `aws-us-east-1`  | Ashburn, N. Virginia    | `us-east4`          |
+| `aws-us-east-2`  | Columbus, Ohio          | `us-east5`          |
+| `aws-us-west-2`  | Portland, Oregon        | `us-west1`          |
+| `aws-eu-central-1` | Frankfurt             | `europe-west3`      |
+| `aws-ap-southeast-1` | Singapore           | `asia-southeast1`   |
+
+The trap is `us-east1`: it reads like the match for `aws-us-east-1`, but it is in Moncks
+Corner, South Carolina — roughly 700 km from Ashburn, adding ~10 ms to every query.
+`us-east4` is the Ashburn region and the correct pairing.
+
+anuvia runs in **`us-east4`** because its Neon project is in `aws-us-east-1`.
 
 ### Put the database in the same geography
 

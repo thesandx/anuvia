@@ -68,6 +68,7 @@ logs → stdout → Cloud Logging
 - **Horizontal, automatic.** Cloud Run adds instances under load and removes them when idle, down to zero.
 - **Concurrency per instance.** One instance handles many concurrent requests. The app is safe under this because it is stateless and each request gets its own database session. Do not add process-global mutable state.
 - **The database is the scaling ceiling.** Cloud Run scales faster than a single database primary. Neon's connection pooler (PgBouncer) absorbs the connection churn. If instance count grows large, use Neon's pooled endpoint and consider read replicas for read-heavy paths — the same mechanism as [multi-region.md](./multi-region.md) step 3, applied for scale rather than geography.
+- **Instances are capped at 3** (`--max-instances 3` in `deploy.yml`). The cap exists because each instance opens its own SQLAlchemy connection pool, so uncapped autoscaling reaches Neon's connection ceiling before it reaches a CPU limit. Raise it and the pooled Neon endpoint together, not separately.
 
 ---
 
