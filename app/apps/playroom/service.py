@@ -268,9 +268,10 @@ class PlayroomService:
 
         selections: list[int] = []
         boards: dict[UUID, list[int]] = {}
+        last_pick: tuple[int, UUID] | None = None
         if game_round is not None:
             engine = engine_for(room.game_id)
-            selections, boards = await engine.load_view(self.db, game_round)
+            selections, boards, last_pick = await engine.load_view(self.db, game_round)
 
         return serializers.room_payload(
             room=room,
@@ -278,6 +279,7 @@ class PlayroomService:
             game_round=game_round,
             selections=selections,
             boards=boards,
+            last_pick=last_pick,
             viewer_id=viewer.id if viewer else None,
         )
 

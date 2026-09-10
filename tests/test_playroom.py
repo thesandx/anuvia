@@ -397,6 +397,78 @@ async def test_two_players_may_send_the_same_idempotency_key(client):
     assert set(second.json()["bingo"]["cards"]) == {joined["playerId"]}
 
 
+# --- the last pick ---------------------------------------------------------
+
+
+async def test_the_room_reports_who_took_the_last_number(client):
+    created = await create_room(client)
+    key, host_token = created["room"]["key"], created["playerToken"]
+    joined = await join_room(client, key, "Dev")
+    await client.post(f"{BASE}/rooms/{key}/rounds", headers=auth(host_token))
+
+    fresh = (await client.get(f"{BASE}/rooms/{key}", headers=auth(host_token))).json()
+    assert fresh["bingo"]["lastPick"] is None
+
+    room = (await select(client, key, host_token, 17)).json()
+    assert room["bingo"]["lastPick"] == {"value": 17, "playerId": created["playerId"]}
+
+    room = (await select(client, key, joined["playerToken"], 4)).json()
+    assert room["bingo"]["lastPick"] == {"value": 4, "playerId": joined["playerId"]}
+    # It always matches the end of the taken list.
+    assert room["bingo"]["selected"][-1] == room["bingo"]["lastPick"]["value"]
+
+
+async def test_the_last_pick_survives_a_player_leaving(client):
+    """The reason this comes from the server rather than the client.
+
+    Stepping back one place through `turnOrder` looks like it would give the
+    same answer, until somebody leaves: removal rebases the index, and the
+    previous seat is then the wrong player.
+    """
+    created = await create_room(client)
+    key, host_token = created["room"]["key"], created["playerToken"]
+    second = await join_room(client, key, "Dev")
+    third = await join_room(client, key, "Ada", color="yellow")
+    await client.post(f"{BASE}/rooms/{key}/rounds", headers=auth(host_token))
+
+    await select(client, key, host_token, 3)
+    await select(client, key, second["playerToken"], 8)
+
+    await client.delete(
+        f"{BASE}/rooms/{key}/players/{second['playerId']}", headers=auth(host_token)
+    )
+
+    room = (await client.get(f"{BASE}/rooms/{key}", headers=auth(host_token))).json()
+    # The player who took 8 has gone, and the record of who took it has not.
+    assert room["bingo"]["lastPick"] == {"value": 8, "playerId": second["playerId"]}
+    assert third["playerId"] in room["bingo"]["turnOrder"]
+
+
+async def test_a_timed_out_turn_is_still_a_last_pick(client, db_session):
+    """A number taken by the clock is still the latest number on the board."""
+    created = await create_room(client)
+    key, token = created["room"]["key"], created["playerToken"]
+    await client.post(f"{BASE}/rooms/{key}/rounds", headers=auth(token))
+    await expire_the_turn(db_session, key)
+
+    room = (await client.get(f"{BASE}/rooms/{key}", headers=auth(token))).json()
+    assert room["bingo"]["lastPick"] is not None
+    assert room["bingo"]["lastPick"]["playerId"] == created["playerId"]
+    assert room["bingo"]["lastPick"]["value"] == room["bingo"]["selected"][-1]
+
+
+async def test_a_fresh_round_has_no_last_pick(client):
+    created = await create_room(client, settings={**DEFAULT_SETTINGS, "rounds": 2})
+    key, token = created["room"]["key"], created["playerToken"]
+    await client.post(f"{BASE}/rooms/{key}/rounds", headers=auth(token))
+    for value in range(1, CARD_SIZE + 1):
+        await select(client, key, token, value)
+
+    room = (await client.post(f"{BASE}/rooms/{key}/rounds/advance", headers=auth(token))).json()
+    assert room["round"] == 2
+    assert room["bingo"]["lastPick"] is None
+
+
 # --- the turn clock --------------------------------------------------------
 
 
