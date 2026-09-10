@@ -17,6 +17,7 @@ append-only table with the right unique constraint, rather than storing
 per-player copies.**
 """
 
+import secrets
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Protocol
@@ -31,6 +32,7 @@ from app.apps.playroom.bingo import (
     CARD_SIZE,
     HIGHEST_NUMBER,
     LINES_TO_WIN,
+    LOWEST_NUMBER,
     create_card,
     find_winning_lines,
     is_playable_number,
@@ -105,6 +107,15 @@ class GameEngine(Protocol):
     ) -> tuple[list[int], dict[UUID, list[int]]]:
         """Everything the serialiser needs, before scoping."""
 
+    async def auto_move(
+        self,
+        db: AsyncSession,
+        game_round: models.Round,
+        player: models.Player,
+        players: list[models.Player],
+    ) -> ActionResult | None:
+        """Play for a player whose turn ran out, or return None if it cannot."""
+
 
 class BingoEngine:
     """Turn-based Bingo on a 1-25 board.
@@ -152,6 +163,39 @@ class BingoEngine:
         if action_type == "claim_bingo":
             return await self._claim_bingo(db, game_round, player, players)
         raise RoomError("wrong-phase", "That move does not exist in this game.")
+
+    async def auto_move(
+        self,
+        db: AsyncSession,
+        game_round: models.Round,
+        player: models.Player,
+        players: list[models.Player],
+    ) -> ActionResult | None:
+        """Takes a number for a player who ran out of time.
+
+        The number is drawn from the ones still free. "From their own board" and
+        "still free" are the same set here, because every board holds all 25
+        numbers — a player can always take any number nobody else has.
+
+        It is a real move: the same insert, the same turn advance, the same
+        end-of-round check. The only difference is who chose, and the event
+        records that so a timed-out turn is never mistaken for a played one.
+        """
+        taken = set(await self._selections(db, game_round.id))
+        free = [n for n in range(LOWEST_NUMBER, HIGHEST_NUMBER + 1) if n not in taken]
+        if not free:
+            return None
+
+        result = await self._select_number(
+            db, game_round, player, players, {"value": secrets.choice(free)}
+        )
+        for event in result.events:
+            if event.type == "number_selected":
+                event.payload["auto"] = True
+        result.events.append(
+            EventSpec(type="turn_timed_out", player_id=player.id, payload={"seat": player.seat})
+        )
+        return result
 
     # --- moves ---------------------------------------------------------------
 

@@ -39,6 +39,16 @@ logger = get_logger(__name__)
 #: promise: "keys stop working two hours after the last round".
 ROOM_TTL = timedelta(hours=settings.PLAYROOM_ROOM_TTL_HOURS)
 
+#: How long a player has to take their turn. Past this, the turn is played for
+#: them and passes on.
+#:
+#: Twenty seconds is long enough to read a board of 25 numbers and short enough
+#: that a room does not stall on one person. It is a game-design number rather
+#: than an operational one, so it is a constant here instead of a setting — and
+#: the client never hard-codes it, it renders the seconds the server reports.
+TURN_SECONDS = 20
+TURN_LIMIT = timedelta(seconds=TURN_SECONDS)
+
 #: A host who has not been seen for this long is replaced, provided somebody
 #: else has been. Two seconds is the client's poll interval, so a minute of
 #: silence is a closed tab rather than a slow network.
@@ -509,6 +519,10 @@ class PlayroomService:
                 else:
                     game_round.current_turn_index = remaining.index(active_id)
                 game_round.turn_order = remaining
+                if active_id == str(target_id) and remaining:
+                    # The turn just changed hands. Whoever inherits it should
+                    # not inherit the departing player's remaining seconds.
+                    self._restart_turn_clock(game_round)
 
         self._touch(room)
         await self._record(
@@ -558,6 +572,7 @@ class PlayroomService:
         )
         self.db.add(game_round)
         await self.db.flush()
+        self._restart_turn_clock(game_round)
 
         engine = engine_for(room.game_id)
         await engine.deal(self.db, game_round, [person.id for person in players])
@@ -640,18 +655,7 @@ class PlayroomService:
             await self.db.commit()
             raise
 
-        if result.ended:
-            self._finish_round(room, game_round, players, result)
-
-        self._touch(room)
-        for event in result.events:
-            await self._record(
-                room,
-                event.type,
-                event.payload,
-                player_id=event.player_id,
-                round_id=game_round.id,
-            )
+        await self._apply_result(room, game_round, players, result)
 
         # Built before the commit, because the record of what this key produced
         # has to be written in the same transaction as the move it describes.
@@ -670,6 +674,110 @@ class PlayroomService:
 
         await self._commit_and_publish(room)
         return result_payload
+
+    def _restart_turn_clock(self, game_round: models.Round) -> None:
+        """Gives whoever is now on turn a full slice of time.
+
+        Called wherever the turn changes hands — a deal, a selection, a player
+        leaving — rather than only after a move, because a player who inherits
+        the turn from somebody who left should not inherit their remaining two
+        seconds either.
+        """
+        game_round.turn_expires_at = now() + TURN_LIMIT
+
+    async def _apply_result(
+        self,
+        room: models.Room,
+        game_round: models.Round,
+        players: list[models.Player],
+        result: ActionResult,
+    ) -> None:
+        """The half of a move that is the same whoever, or whatever, made it.
+
+        Shared by a player's action and by a turn played out on the clock, so
+        the two cannot drift: an automatic move ends a round, scores it and
+        records its events exactly as a deliberate one does.
+        """
+        if result.ended:
+            self._finish_round(room, game_round, players, result)
+            game_round.turn_expires_at = None
+        else:
+            self._restart_turn_clock(game_round)
+
+        self._touch(room)
+        for event in result.events:
+            await self._record(
+                room,
+                event.type,
+                event.payload,
+                player_id=event.player_id,
+                round_id=game_round.id,
+            )
+
+    async def enforce_turn_deadline(self, room: models.Room) -> bool:
+        """Plays the turn of anybody who has run out of time.
+
+        This is what makes the deadline real when the player it applies to has
+        closed their tab: their own client cannot fire it, so it is driven by
+        whoever else is looking. Every other client polls every two seconds, so
+        somebody notices within that.
+
+        At most one turn is settled per call. If a whole room walks away, the
+        alternative is that the first person to come back watches the board
+        play itself out — bounded, but startling. One at a time means play
+        resumes at the pace of people actually being there.
+        """
+        if room.phase != models.PHASE_PLAYING:
+            return False
+
+        game_round = await self.current_round(room)
+        if game_round is None or game_round.status != models.ROUND_PLAYING:
+            return False
+        if not self._turn_is_due(game_round):
+            return False
+
+        # Re-read under a lock and re-check: every client in the room is polling,
+        # so several of them see the same expired turn at the same moment and
+        # only one may act on it.
+        locked = await self._locked_current_round(room)
+        if locked is None or locked.status != models.ROUND_PLAYING:
+            return False
+        if not self._turn_is_due(locked):
+            return False
+
+        players = await self.players_of(room)
+        order: list[str] = list(locked.turn_order or [])
+        if not players or not order:
+            return False
+
+        on_turn_id = order[locked.current_turn_index % len(order)]
+        player = next((person for person in players if str(person.id) == on_turn_id), None)
+        if player is None:
+            # The player on turn has left and removal already rebased the index;
+            # nothing to play for them.
+            return False
+
+        engine = engine_for(room.game_id)
+        result = await engine.auto_move(self.db, locked, player, players)
+        if result is None:
+            # Nothing left to play. The round ends on its own rules, not here.
+            return False
+
+        await self._apply_result(room, locked, players, result)
+        await self._commit_and_publish(room)
+        logger.info("Played a timed-out turn in room %s", room.key)
+        return True
+
+    @staticmethod
+    def _turn_is_due(game_round: models.Round) -> bool:
+        """True when the current turn has run past its deadline.
+
+        A round with no deadline is never due. Rounds that were already running
+        when the deadline shipped have none, and they finish under the old rules
+        rather than having every turn expire at once.
+        """
+        deadline = _aware(game_round.turn_expires_at)
+        return deadline is not None and deadline <= now()
 
     async def _locked_current_round(self, room: models.Room) -> models.Round | None:
         """The current round, locked for the length of the transaction.
@@ -755,6 +863,7 @@ class PlayroomService:
         if game_round is not None and game_round.status == models.ROUND_PLAYING:
             game_round.status = models.ROUND_ABANDONED
             game_round.ended_at = now()
+            game_round.turn_expires_at = None
         self._touch(room)
         await self._record(room, "session_ended", {"reason": "host_ended"})
         await self._commit_and_publish(room)
@@ -936,6 +1045,7 @@ async def stream_room(
                 try:
                     room = await service.load_room(key)
                     viewer = await service.resolve_player(room, token)
+                    await service.enforce_turn_deadline(room)
                     payload = await service.payload_for(room, viewer)
                     await db.commit()
                 except RoomError as error:

@@ -47,6 +47,24 @@ def player_payload(player: models.Player, host_id: UUID | None) -> dict:
     }
 
 
+def turn_seconds_remaining(game_round: models.Round) -> int | None:
+    """Seconds left on the current turn, or None when nothing is on the clock.
+
+    Sent as a duration rather than as the deadline itself, which is the one
+    place this payload departs from "timestamps are absolute". The room's
+    two-hour expiry can afford an absolute time because a phone clock that is a
+    minute out changes nothing about it. A twenty-second turn cannot: the same
+    skew would show a player four seconds when they have twenty, or run their
+    clock out before they have moved. A duration is measured against the same
+    clock that set it, so it is right on every device.
+    """
+    deadline = game_round.turn_expires_at
+    if deadline is None or game_round.status != models.ROUND_PLAYING:
+        return None
+    moment = deadline if deadline.tzinfo is not None else deadline.replace(tzinfo=UTC)
+    return max(0, int((moment - datetime.now(UTC)).total_seconds() + 0.999))
+
+
 def bingo_payload(
     game_round: models.Round,
     selections: list[int],
@@ -81,6 +99,7 @@ def bingo_payload(
         "currentTurnIndex": game_round.current_turn_index,
         "winnerId": str(winner_id) if winner_id is not None else None,
         "winningLines": list(game_round.win_detail or []),
+        "turnSecondsRemaining": turn_seconds_remaining(game_round),
     }
 
 

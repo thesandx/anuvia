@@ -121,6 +121,16 @@ async def get_room(
     room = await service.load_room(key)
     viewer = await service.resolve_player(room, bearer_token(authorization))
 
+    # The read is what drives the turn clock. A player who has closed their tab
+    # cannot time their own turn out, so it is settled by whoever else is
+    # looking — and everybody in the room reads this every two seconds.
+    #
+    # Deliberately not enforced on the action route. A tap sent at nineteen
+    # seconds that arrives at twenty-one is a player who did take their turn,
+    # and replacing their number with a random one because of half a second of
+    # network would be a worse bug than the one this fixes.
+    await service.enforce_turn_deadline(room)
+
     # Promotion has to run before the validator is computed: it bumps the
     # version, and a 304 issued after it would hide a new host from the room.
     await service.promote_host_if_needed(room, await service.players_of(room))

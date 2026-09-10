@@ -210,6 +210,10 @@ class Round(Base):
     win_detail: Mapped[list | None] = mapped_column(JsonColumn, nullable=True)
     #: Per-game extras, and the round-results rows once a round ends.
     state: Mapped[dict] = mapped_column(JsonColumn, nullable=False, default=dict)
+    #: When the current player's turn runs out. A turn that passes this is
+    #: played for them, so one person who walked away cannot hold up the room.
+    #: Null on a round that has ended.
+    turn_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
