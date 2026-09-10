@@ -603,6 +603,38 @@ async def test_replay_returns_to_the_lobby_and_zeroes_the_scores(client):
     assert (await client.post(f"{BASE}/rooms/{key}/rounds", headers=auth(token))).status_code == 200
 
 
+async def test_replay_is_allowed_straight_from_the_results_screen(client):
+    """The results screen of a final round is where a session actually ends.
+
+    The client offers "Play again, same room" there as well as on the
+    scoreboard, so replay has to be accepted in `round-results` and not only in
+    `finished`. A phase guard added to `replay_session` would break that button
+    with nothing else failing.
+    """
+    created = await create_room(client)
+    key, token = created["room"]["key"], created["playerToken"]
+    await client.post(f"{BASE}/rooms/{key}/rounds", headers=auth(token))
+    for value in range(1, CARD_SIZE + 1):
+        await select(client, key, token, value)
+
+    room = (await client.get(f"{BASE}/rooms/{key}", headers=auth(token))).json()
+    assert room["phase"] == "round-results"
+    assert room["players"][0]["score"] > 0
+
+    response = await client.post(f"{BASE}/rooms/{key}/replay", headers=auth(token))
+    assert response.status_code == 200, response.text
+    room = response.json()
+    assert room["phase"] == "lobby"
+    assert room["round"] == 1
+    assert room["bingo"] is None
+    assert all(player["score"] == 0 for player in room["players"])
+
+    # And the room is genuinely usable again, not just relabelled.
+    started = await client.post(f"{BASE}/rooms/{key}/rounds", headers=auth(token))
+    assert started.status_code == 200, started.text
+    assert started.json()["phase"] == "playing"
+
+
 async def test_the_host_ends_the_session(client):
     created = await create_room(client)
     key, token = created["room"]["key"], created["playerToken"]
