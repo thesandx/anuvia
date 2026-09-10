@@ -104,8 +104,12 @@ class GameEngine(Protocol):
 
     async def load_view(
         self, db: AsyncSession, game_round: models.Round
-    ) -> tuple[list[int], dict[UUID, list[int]]]:
-        """Everything the serialiser needs, before scoping."""
+    ) -> tuple[list[int], dict[UUID, list[int]], tuple[int, UUID] | None]:
+        """Everything the serialiser needs, before scoping.
+
+        The third value is the most recent move, as (what, who), or None for a
+        game that has no such notion.
+        """
 
     async def auto_move(
         self,
@@ -144,10 +148,13 @@ class BingoEngine:
 
     async def load_view(
         self, db: AsyncSession, game_round: models.Round
-    ) -> tuple[list[int], dict[UUID, list[int]]]:
-        selections = await self._selections(db, game_round.id)
+    ) -> tuple[list[int], dict[UUID, list[int]], tuple[int, UUID] | None]:
+        # The rows already carry who took each number, so reading them costs
+        # nothing over reading the numbers alone.
+        rows = await self._selection_rows(db, game_round.id)
         boards = await self._boards(db, game_round.id)
-        return selections, boards
+        last = (rows[-1].number, rows[-1].player_id) if rows else None
+        return [int(row.number) for row in rows], boards, last
 
     async def apply_action(
         self,

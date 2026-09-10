@@ -69,6 +69,7 @@ def bingo_payload(
     game_round: models.Round,
     selections: list[int],
     boards: dict[UUID, list[int]],
+    last_pick: tuple[int, UUID] | None,
     viewer_id: UUID | None,
 ) -> dict:
     """The `bingo` block, with `cards` narrowed to what the caller may see.
@@ -100,6 +101,15 @@ def bingo_payload(
         "winnerId": str(winner_id) if winner_id is not None else None,
         "winningLines": list(game_round.win_detail or []),
         "turnSecondsRemaining": turn_seconds_remaining(game_round),
+        # The most recent number, and who took it. The number is also the last
+        # entry of `selected`, but who took it is not recoverable from the
+        # client's side: stepping back through `turnOrder` breaks the moment
+        # somebody joins or leaves mid-round, and the server already knows.
+        "lastPick": (
+            {"value": int(last_pick[0]), "playerId": str(last_pick[1])}
+            if last_pick is not None
+            else None
+        ),
     }
 
 
@@ -109,6 +119,7 @@ def room_payload(
     game_round: models.Round | None,
     selections: list[int],
     boards: dict[UUID, list[int]],
+    last_pick: tuple[int, UUID] | None,
     viewer_id: UUID | None,
 ) -> dict:
     """The whole `Room` object, exactly as the client's type declares it.
@@ -134,7 +145,11 @@ def room_payload(
         "round": room.round_number,
         "players": [player_payload(player, room.host_player_id) for player in players],
         "settings": room.settings,
-        "bingo": (bingo_payload(game_round, selections, boards, viewer_id) if show_bingo else None),
+        "bingo": (
+            bingo_payload(game_round, selections, boards, last_pick, viewer_id)
+            if show_bingo
+            else None
+        ),
         "lastRound": last_round,
         "createdAt": iso_z(room.created_at),
         "expiresAt": iso_z(room.expires_at),

@@ -58,6 +58,13 @@ class WinningLine(CamelModel):
     cells: list[int]
 
 
+class LastPick(CamelModel):
+    """The most recent number, and who took it."""
+
+    value: int
+    player_id: str
+
+
 class BingoState(CamelModel):
     #: Numbers taken so far, in the order they were chosen. The single source
     #: of truth for what is marked, on every board at once.
@@ -75,6 +82,8 @@ class BingoState(CamelModel):
     #: clock. A duration, not a deadline, so a skewed device clock cannot
     #: mis-time a twenty-second turn.
     turn_seconds_remaining: int | None = None
+    #: The most recent move. Null before anybody has taken a number.
+    last_pick: LastPick | None = None
 
 
 class RoundResultRow(CamelModel):
