@@ -16,13 +16,13 @@ Read this before you touch anything in `.github/workflows/`.
 
 The gate has **three required checks**: `Lint & Test`, `Docker image builds`, and `Analyze python`. Require all three in branch protection. See [`cloud/deployment.md`](../../cloud/deployment.md).
 
-`Migrations (Neon branch)` is a fourth job and is deliberately **not** required — it is the only job needing a credential, so it cannot run on a fork. Requiring it would block every fork's pull request.
+`Migrations (Neon branch)` is a fourth job and is deliberately **not** required. It is the only job needing a credential, so it cannot run on a fork. Requiring it would block every fork's pull request.
 
 ---
 
 ## deploy.yml runs the migrations
 
-`deploy.yml` runs `alembic upgrade head` once, after the image push and before `gcloud run deploy`. The container `CMD` does not migrate. Do not move it back — see [`deployment.md`](./deployment.md).
+`deploy.yml` runs `alembic upgrade head` once, after the image push and before `gcloud run deploy`. The container `CMD` does not migrate. Do not move it back: see [`deployment.md`](./deployment.md).
 
 ---
 
@@ -30,7 +30,7 @@ The gate has **three required checks**: `Lint & Test`, `Docker image builds`, an
 
 Two jobs run in parallel.
 
-**Job `test` (`Lint & Test`)** — the fast gate:
+**Job `test` (`Lint & Test`)**: the fast gate:
 
 ```yaml
 - run: ruff check .              # lint
@@ -38,25 +38,25 @@ Two jobs run in parallel.
 - run: pytest tests/ -v          # tests, dummy SECRET_KEY, in-memory SQLite
 ```
 
-**Job `docker` (`Docker image builds`)** — proves the production image works:
+**Job `docker` (`Docker image builds`)**: proves the production image works:
 
 - Builds the real image with Buildx and the GitHub Actions cache. Nothing is pushed.
 - Runs the same two steps production runs, in the same order: `alembic upgrade head` in a throwaway container, then the server. Both share a volume so the server sees the migrated database. This mirrors the deploy sequence rather than a sequence only CI uses.
 - Polls `/health` until it answers. This catches what a build alone cannot: the app failing to start, binding to `localhost` instead of `0.0.0.0`, or ignoring `$PORT`.
-- SQLite keeps the job free of any external database — the same choice the unit tests make.
+- SQLite keeps the job free of any external database. The same choice the unit tests make.
 
-**Job `migrations` (`Migrations (Neon branch)`)** — proves the migrations apply to the *real* production schema:
+**Job `migrations` (`Migrations (Neon branch)`)**: proves the migrations apply to the *real* production schema:
 
 - Creates a Neon branch from the production branch. A Neon branch is a copy-on-write clone: same schema, same data, made in seconds, free while idle.
 - Runs `alembic upgrade head` against it. This is the check SQLite cannot give: it applies the pull request's migration to a copy of production, on PostgreSQL.
-- If the pull request **adds** migration files, it also rolls them back and reapplies them. It counts the added files with `git diff --diff-filter=A` against the base branch, so it never rolls back a migration that is already in production — a check that fails on unrelated pull requests is one people learn to ignore.
+- If the pull request **adds** migration files, it also rolls them back and reapplies them. It counts the added files with `git diff --diff-filter=A` against the base branch, so it never rolls back a migration that is already in production. A check that fails on unrelated pull requests is one people learn to ignore.
 - Deletes the branch with `if: always()`, so a failed migration leaves nothing behind.
 - Skips itself unless the run is a pull request from this repository (not a fork) and `vars.NEON_PROJECT_ID` is set. A skipped job reports success, so forks are never blocked.
 - Needs `NEON_API_KEY` (secret) and `NEON_PROJECT_ID` (variable); `NEON_PRODUCTION_BRANCH` (variable) overrides the `production` parent branch name.
 
 Rules:
 
-- **The two required jobs use dummy secrets and SQLite.** Their `SECRET_KEY` and `DATABASE_URL` are throwaway values, so they never need a real credential. Keep it that way — it is what lets a fork's pull request run. `Migrations (Neon branch)` is the deliberate exception, and it skips rather than fails when the credential is absent.
+- **The two required jobs use dummy secrets and SQLite.** Their `SECRET_KEY` and `DATABASE_URL` are throwaway values, so they never need a real credential. Keep it that way: it is what lets a fork's pull request run. `Migrations (Neon branch)` is the deliberate exception, and it skips rather than fails when the credential is absent.
 - **The `test` steps match the local gate.** If `ruff check`, `ruff format --check`, and `pytest` pass locally, they pass in CI. If they do not, your local environment differs from `requirements.txt`.
 - **The job names are `Lint & Test` and `Docker image builds`.** Branch protection requires these exact names. If you rename a job, update the branch protection rule.
 - **`permissions: contents: read` and `concurrency` cancel-in-progress.** The gate only reads the repository, and a new push cancels the superseded run.
@@ -87,9 +87,9 @@ on:
 Rules:
 
 - **It runs only on `main`.** A feature branch never deploys. The deploy happens on the push that a merged pull request creates.
-- **It builds, tags with the commit SHA, pushes, and deploys the SHA tag.** The SHA tag is what makes a rollback a traffic shift. Do not deploy the `latest` tag to a revision — a revision pinned to a moving tag cannot be traced to a commit.
+- **It builds, tags with the commit SHA, pushes, and deploys the SHA tag.** The SHA tag is what makes a rollback a traffic shift. Do not deploy the `latest` tag to a revision: a revision pinned to a moving tag cannot be traced to a commit.
 - **Secrets come from GitHub, non-sensitive values from GitHub variables.** `vars.*` for the project id, region, service name, and `ARTIFACT_REPOSITORY`. `secrets.*` for the two `WIF_*` values, `SECRET_KEY`, and `DATABASE_URL`.
-- **`permissions: contents: read` plus `id-token: write`.** The `id-token` scope lets GitHub mint the OIDC token for Workload Identity Federation. Keep it on the deploy job only — no other job needs it.
+- **`permissions: contents: read` plus `id-token: write`.** The `id-token` scope lets GitHub mint the OIDC token for Workload Identity Federation. Keep it on the deploy job only: no other job needs it.
 
 ---
 
@@ -116,6 +116,6 @@ Rules:
 
 These are known gaps, not style choices. They are safe to leave for a low-traffic start and worth closing before real users:
 
-- **Done — keyless auth.** `deploy.yml` authenticates with Workload Identity Federation, not a service account key. See [`cloud/github-actions.md`](../../cloud/github-actions.md). Do not reintroduce a key.
-- **Secrets are passed as `--set-env-vars`**, which stores them in the revision. Migrate to Secret Manager with `--set-secrets` — see [`cloud/environment-variables.md`](../../cloud/environment-variables.md).
-- **`deploy.yml` runs the migration inside the container.** Move it to a deploy-time step before you scale to more than one instance — see [deployment.md](./deployment.md).
+- **Done: keyless auth.** `deploy.yml` authenticates with Workload Identity Federation, not a service account key. See [`cloud/github-actions.md`](../../cloud/github-actions.md). Do not reintroduce a key.
+- **Secrets are passed as `--set-env-vars`**, which stores them in the revision. Migrate to Secret Manager with `--set-secrets`: see [`cloud/environment-variables.md`](../../cloud/environment-variables.md).
+- **`deploy.yml` runs the migration inside the container.** Move it to a deploy-time step before you scale to more than one instance: see [deployment.md](./deployment.md).

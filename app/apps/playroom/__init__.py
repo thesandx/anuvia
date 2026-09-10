@@ -1,4 +1,4 @@
-"""Playroom — party games played from a shared six-character room key.
+"""Playroom, party games played from a shared six-character room key.
 
 The full server contract is in the frontend repository, at
 `docs/backend-handover.md`. Read it before you change a payload shape: the

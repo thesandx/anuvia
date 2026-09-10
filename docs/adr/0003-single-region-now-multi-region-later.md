@@ -16,23 +16,23 @@ The question that forces this decision: "should anuvia be multi-region, and if s
 
 ## Decision
 
-We will **run single-region now**, with Cloud Run and the Neon database in the **same geography**, and keep a **single write primary** in every future step. We will add regions only when a real, measured latency problem for a distant user base justifies it, and then by the **regional-compute, local-read-replica, single-write-primary** pattern — never by sharding the schema per app and never by adopting multi-primary writes.
+We will **run single-region now**, with Cloud Run and the Neon database in the **same geography**, and keep a **single write primary** in every future step. We will add regions only when a real, measured latency problem for a distant user base justifies it, and then by the **regional-compute, local-read-replica, single-write-primary** pattern, never by sharding the schema per app and never by adopting multi-primary writes.
 
 The full runbook is [`cloud/multi-region.md`](../../cloud/multi-region.md). This ADR records why.
 
 ## Alternatives considered
 
-### Option A — Single region now, co-located app and database (chosen for phase 1)
+### Option A: Single region now, co-located app and database (chosen for phase 1)
 
 Deploy Cloud Run and Neon in the same geography. Pick the region closest to the primary user base. Use Neon's pooled (PgBouncer) connection string. Cost is about $0 on both free tiers.
 
 This removes the real latency problem (app-to-database distance) and defers the cost and complexity of extra regions until there is evidence they are needed. It is the correct starting point for every solo project.
 
-### Option B — Regional compute + local read replica + single write primary (chosen for phase 2)
+### Option B: Regional compute + local read replica + single write primary (chosen for phase 2)
 
 When a distant user base has a measured latency problem: deploy Cloud Run to each needed region behind a global external HTTPS load balancer. Give each region a **read replica** of the database. Route **all writes to the single primary region**; serve reads that tolerate slight staleness from the local replica.
 
-This is the standard, affordable multi-region pattern. It classifies work by app type — writes and strongly consistent reads go to the primary; read-heavy, lag-tolerant reads go local:
+This is the standard, affordable multi-region pattern. It classifies work by app type, writes and strongly consistent reads go to the primary; read-heavy, lag-tolerant reads go local:
 
 | App                     | Access pattern                          | Where it runs           |
 | ----------------------- | --------------------------------------- | ----------------------- |
@@ -41,19 +41,19 @@ This is the standard, affordable multi-region pattern. It classifies work by app
 | `auth` token → user     | Read on every authenticated request     | Local replica or cache  |
 | `ai_chat` history reads | Read-heavy, append-only, lag-tolerant   | Local replica           |
 
-### Option C — Multi-primary / globally writable database
+### Option C: Multi-primary / globally writable database
 
 A database that accepts writes in every region (a distributed SQL system, or multi-master PostgreSQL).
 
-Rejected. It is expensive, operationally heavy, and solves a problem this app does not have. Payments and auth need strong consistency; conflict resolution across write primaries is exactly the complexity a solo developer must avoid. If write latency for distant users ever becomes the binding constraint, that is a specific, later decision with its own ADR — not the default.
+Rejected. It is expensive, operationally heavy, and solves a problem this app does not have. Payments and auth need strong consistency; conflict resolution across write primaries is exactly the complexity a solo developer must avoid. If write latency for distant users ever becomes the binding constraint, that is a specific, later decision with its own ADR, not the default.
 
-### Option D — Turso / distributed SQLite at the edge
+### Option D: Turso / distributed SQLite at the edge
 
 Adopt libSQL replicas near users instead of PostgreSQL.
 
 Rejected for now, for the reasons in [ADR-0002](./0002-use-neon-postgres-for-persistence.md): the SQLAlchemy dialect is sync-only and does not fit the async stack, and the edge-read benefit only pays off with a global, read-dominant user base. It remains the option to reconsider if the workload becomes exactly that.
 
-### Option E — Cloud Run multi-region with every region reading the single primary (no replica)
+### Option E: Cloud Run multi-region with every region reading the single primary (no replica)
 
 Deploy compute to several regions but keep one database, so distant regions read across the world.
 
@@ -70,7 +70,7 @@ Rejected. It makes latency worse, not better: a distant instance now pays the lo
 
 **Bad**
 
-- Users far from the single region see higher latency until phase 2. Accepted deliberately — it is not worth paying for regions before there are users in them.
+- Users far from the single region see higher latency until phase 2. Accepted deliberately. It is not worth paying for regions before there are users in them.
 - Phase 2 adds real cost and operational surface: read replicas (a paid Neon feature or a Cloud SQL replica), a global load balancer (~$18+/month base), and read/write routing in the app.
 - Read replicas serve slightly stale data. Every read routed to a replica must tolerate replication lag. Reads that cannot must go to the primary.
 - Two prerequisites must be fixed first (below), which is work before any region is added.
@@ -93,7 +93,7 @@ Rejected. It makes latency worse, not better: a distant instance now pays the lo
 
 ## References
 
-- [`cloud/multi-region.md`](../../cloud/multi-region.md) — the runbook
+- [`cloud/multi-region.md`](../../cloud/multi-region.md). The runbook
 - [ADR-0001](./0001-use-cloud-run-for-hosting.md), [ADR-0002](./0002-use-neon-postgres-for-persistence.md)
 - [Neon read replicas](https://neon.tech/docs/introduction/read-replicas)
 - [Cloud Run and global load balancing](https://cloud.google.com/run/docs/multiple-regions)

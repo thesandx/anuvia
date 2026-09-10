@@ -6,7 +6,7 @@
 
 ## Context
 
-What situation forces a decision? Constraints, requirements, and what happens if nothing is decided. Facts and pressures only — no solution yet.
+What situation forces a decision? Constraints, requirements, and what happens if nothing is decided. Facts and pressures only: no solution yet.
 
 ## Decision
 
@@ -14,7 +14,7 @@ State what you decided, actively and unambiguously: "We will ...".
 
 ## Alternatives considered
 
-### Option A — the one chosen
+### Option A: the one chosen
 
 Why it wins.
 

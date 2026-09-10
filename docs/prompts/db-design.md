@@ -12,7 +12,7 @@ finalise the design, design the schema here, then build.
 ---
 
 ```markdown
-# Database Design — Anuvia (PostgreSQL / async SQLAlchemy)
+# Database Design: Anuvia (PostgreSQL / async SQLAlchemy)
 
 You are a senior data architect. Design the database schema for the feature
 below so it is correct, scalable, and fast to query. Do not write application
@@ -20,14 +20,14 @@ code yet. Work through the phases. Stop at each checkpoint and wait for my
 approval before continuing.
 
 ## What we are storing
-<<DESCRIBE THE FEATURE AND ITS DATA IN 3–6 SENTENCES. What are the main things
+<<DESCRIBE THE FEATURE AND ITS DATA IN 3-6 SENTENCES. What are the main things
 (entities)? Who reads and writes them, and how often? Name the queries that must
 be fast. Include the expected data volume and growth if you know it. Paste the
 PRD or the technical design if you have one.>>
 
 ## The stack you must fit (do not deviate)
 - **PostgreSQL** in production (Neon, serverless), over **asyncpg**. SQLite
-  (aiosqlite) for local and tests — so avoid Postgres-only types that break the
+  (aiosqlite) for local and tests, so avoid Postgres-only types that break the
   SQLite test run unless you flag the trade-off.
 - **Async SQLAlchemy 2.0** with `Mapped[...]` typed models. Every query is
   `async` and `await`ed. No blocking calls.
@@ -36,7 +36,7 @@ PRD or the technical design if you have one.>>
 - A product owns its tables in `app/apps/<name>/models.py`. A table shared
   across products lives in `app/models/`. Queries for a shared model live in
   `app/repositories/`.
-- Response schemas are separate Pydantic models — the ORM object is never
+- Response schemas are separate Pydantic models. The ORM object is never
   returned directly. Design the tables for storage, not for the API shape.
 
 ## Design principles to apply
@@ -49,16 +49,16 @@ PRD or the technical design if you have one.>>
 - **Fast reads need the right index, not more indexes.** Every index has a write
   cost. Justify each one against an access pattern.
 
-## Phase 1 — Access patterns and entities
+## Phase 1: Access patterns and entities
 - List the entities and their relationships (one-to-many, many-to-many), with
   cardinality and ownership.
 - List every read and write access pattern: the query, how often it runs, and
   how fast it must be. Mark the hot paths.
-- Call out the read/write mix per entity — it drives the multi-region strategy
+- Call out the read/write mix per entity. It drives the multi-region strategy
   (write to primary, read from a local replica) recorded in the repo's ADR-0003.
 - **Output:** an entity list and an access-pattern table. → Wait for my sign-off.
 
-## Phase 2 — Logical schema
+## Phase 2: Logical schema
 - For each table: columns, types, primary key, foreign keys, `NOT NULL`,
   `UNIQUE`, `CHECK`, defaults, and enums.
 - Decide the primary key per table and justify it: a `BIGINT` identity for
@@ -70,7 +70,7 @@ PRD or the technical design if you have one.>>
 - Handle many-to-many with an explicit join table, named for the relationship.
 - **Output:** the table definitions plus a simple ERD (text or Mermaid). → Wait.
 
-## Phase 3 — Indexing and query performance
+## Phase 3: Indexing and query performance
 - For each hot access pattern, specify the index that serves it: single-column,
   composite (with the column order and the reason), partial, or covering.
 - Add a unique index for every natural-key uniqueness rule.
@@ -81,10 +81,10 @@ PRD or the technical design if you have one.>>
 - Note any query that needs `EXPLAIN ANALYZE` before it ships.
 - **Output:** an index list, each tied to the pattern it serves. → Wait.
 
-## Phase 4 — Scale and integrity
+## Phase 4: Scale and integrity
 - Project the growth of each table. Name any table that will need partitioning
   (by time or tenant) or an archival/retention plan later. Do not partition
-  early — say the trigger to revisit.
+  early: say the trigger to revisit.
 - If the app is multi-tenant, choose the isolation model (a `tenant_id` column,
   a schema per tenant, or a database per tenant) and justify it.
 - Protect against races: unique constraints over app-side checks, and the right
@@ -93,7 +93,7 @@ PRD or the technical design if you have one.>>
   (pool size vs instance count).
 - **Output:** a scale-and-integrity note with the concrete decisions. → Wait.
 
-## Phase 5 — SQLAlchemy models and the migration plan
+## Phase 5: SQLAlchemy models and the migration plan
 - Write the `Mapped[...]` model classes in the correct files (`app/apps/<name>/
   models.py` or `app/models/`), matching the repo's conventions.
 - Remind me to import each new model module in `alembic/env.py`, or autogenerate
@@ -120,10 +120,10 @@ Start with Phase 1 now.
 
 - Fill in only the `<<...>>` block. Paste the PRD or technical design if you have
   one, so the agent designs from real requirements.
-- Run it after the product design is final and before you write code — it slots
+- Run it after the product design is final and before you write code, it slots
   between Phase 2 and Phase 4 of the [Build Request prompt](./build-request.md).
 - The value is in Phase 1 and Phase 3: designing from the access patterns, then
   indexing for the hot paths. That is what keeps the APIs fast.
 - Phase 5 backward-compatible migrations tie into the rollback plan in
-  `cloud/deployment.md` — a schema change that a previous revision can still run
+  `cloud/deployment.md`. A schema change that a previous revision can still run
   against is what makes a Cloud Run rollback safe.

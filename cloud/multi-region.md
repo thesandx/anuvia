@@ -11,7 +11,7 @@ The decision and its reasoning are in [ADR-0003](../docs/adr/0003-single-region-
 **Not yet. Do this instead, in order:**
 
 1. **Now:** run one region. Put Cloud Run and Neon in the **same geography**. Cost: ~$0.
-2. **When app-to-database latency is the bottleneck in that one region:** move the database to Cloud SQL in the exact same Google Cloud region. Cost: ~$8–10/month.
+2. **When app-to-database latency is the bottleneck in that one region:** move the database to Cloud SQL in the exact same Google Cloud region. Cost: ~$8-10/month.
 3. **Only when a real, distant user base has a measured latency problem:** add regions, each with a local read replica, all writes to one primary. Cost: ~$18+/month plus replicas.
 
 Do not skip to step 3. Multi-region before you have distant users is money and complexity spent on a problem you do not have.
@@ -27,13 +27,13 @@ A single API request in this app runs **several** database queries. For example,
 3. Runs the endpoint's own queries.
 4. Commits.
 
-Every one of those database calls is a round trip. If the app is in one region and the database is in another, each round trip pays the distance between them. A 50 ms gap becomes 150–250 ms per request once you multiply by the number of queries.
+Every one of those database calls is a round trip. If the app is in one region and the database is in another, each round trip pays the distance between them. A 50 ms gap becomes 150-250 ms per request once you multiply by the number of queries.
 
-**This is the number that matters, and you fix it by putting the app and the database together — not by adding regions.** A distant user with a co-located app and database is far better off than a distant user hitting a multi-region setup where the database is still across the world.
+**This is the number that matters, and you fix it by putting the app and the database together: not by adding regions.** A distant user with a co-located app and database is far better off than a distant user hitting a multi-region setup where the database is still across the world.
 
 ---
 
-## Step 1 — one region, co-located (do this now)
+## Step 1: one region, co-located (do this now)
 
 ### Pick the region
 
@@ -52,10 +52,10 @@ Neon runs on AWS, so the region names do not line up with Google's. Match by cit
 | `aws-ap-southeast-1` | Singapore           | `asia-southeast1`   |
 
 The trap is `us-east1`: it reads like the match for `aws-us-east-1`, but it is in Moncks
-Corner, South Carolina — roughly 700 km from Ashburn, adding ~10 ms to every query.
+Corner, South Carolina, roughly 700 km from Ashburn, adding ~10 ms to every query.
 `us-east4` is the Ashburn region and the correct pairing.
 
-anuvia runs in **`us-central1`**, which is *not* co-located — its Neon project is in
+anuvia runs in **`us-central1`**, which is *not* co-located. Its Neon project is in
 `aws-us-east-1`. The move to `us-east4` was attempted on 2026-09-09 and blocked, so read
 this before trying again:
 
@@ -65,7 +65,7 @@ The deploy authenticated, built, and pushed to a us-east4 Artifact Registry repo
 trouble, then failed at `Creating Revision` with `ProjectInitFailedQuotaExceeded`.
 
 That quota counts regions the project has ever been **initialized** in, not regions
-currently holding resources. Emptying a region does not hand the slot back — this was
+currently holding resources. Emptying a region does not hand the slot back. This was
 tested by deleting the only asia-south1 workload, after which the quota still read 3 and
 the deploy failed identically. **Request the quota increase first**
 (IAM & Admin → Quotas → "Number of regions that Cloud Run has been used in"); do not try
@@ -73,12 +73,12 @@ to free a slot by deleting things.
 
 ### Put the database in the same geography
 
-- Create the Neon project in the **same geography** as your Cloud Run region. Neon runs on AWS and Azure; Cloud Run runs on Google Cloud. "Same region" across two clouds means the same metro area (for example, both in `us-east`), not the same datacenter. A small cross-cloud hop remains — it is single-digit to low-double-digit milliseconds within a metro, which is fine at this scale.
+- Create the Neon project in the **same geography** as your Cloud Run region. Neon runs on AWS and Azure; Cloud Run runs on Google Cloud. "Same region" across two clouds means the same metro area (for example, both in `us-east`), not the same datacenter. A small cross-cloud hop remains. It is single-digit to low-double-digit milliseconds within a metro, which is fine at this scale.
 - Use Neon's **pooled** connection string (it runs PgBouncer). Pooling matters more than a few milliseconds of distance when Cloud Run opens many short-lived connections.
 
 ### If you want zero cross-cloud hop
 
-Move the database to **Cloud SQL** in the exact same Google Cloud region as Cloud Run. Same region, same network, lowest latency. The cost is the trade: Cloud SQL does not scale to zero, so the smallest instance is ~$8–10/month whether or not anyone uses it. Do this when latency is measured and real, not preemptively. See [ADR-0002](../docs/adr/0002-use-neon-postgres-for-persistence.md) Option D.
+Move the database to **Cloud SQL** in the exact same Google Cloud region as Cloud Run. Same region, same network, lowest latency. The cost is the trade: Cloud SQL does not scale to zero, so the smallest instance is ~$8-10/month whether or not anyone uses it. Do this when latency is measured and real, not preemptively. See [ADR-0002](../docs/adr/0002-use-neon-postgres-for-persistence.md) Option D.
 
 ### Result
 
@@ -86,11 +86,11 @@ One region, app and database together, ~$0 on free tiers. This is the correct pr
 
 ---
 
-## Step 2 — fix the remaining blocker before adding any region
+## Step 2: fix the remaining blocker before adding any region
 
 One of the two blockers is fixed. Fix the other before adding a region.
 
-### Blocker 1 — migrations run in the container start command — **fixed**
+### Blocker 1: migrations run in the container start command ,  **fixed**
 
 **Done.** `deploy.yml` runs `alembic upgrade head` once, after the image push and before `gcloud run deploy` (Option A below), and the container `CMD` is `exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT}` only. Instances can no longer race on boot, so this no longer blocks adding instances or regions.
 
@@ -100,9 +100,9 @@ Kept for the record, because the constraint it creates is permanent:
 - Option B: a one-off Cloud Run **job** sharing the image, triggered before the service deploy. Worth revisiting if the runner should ever stop holding the production `DATABASE_URL`.
 - Every migration must be **backward compatible** with the currently running revision, because old and new instances overlap during a rollout. Add a column before code reads it; do not drop a column the old code still writes. Across regions the overlap is longer, so this matters more, not less.
 
-### Blocker 2 — the app reads the user on every authenticated request
+### Blocker 2: the app reads the user on every authenticated request
 
-`get_current_user` loads the user from the database on every protected call. In one region this is cheap. Across regions, this is the exact call that cross-region latency punishes — every authenticated request from a distant region would cross the world just to authenticate.
+`get_current_user` loads the user from the database on every protected call. In one region this is cheap. Across regions, this is the exact call that cross-region latency punishes, every authenticated request from a distant region would cross the world just to authenticate.
 
 **Fix, before multi-region:**
 
@@ -111,7 +111,7 @@ Kept for the record, because the constraint it creates is permanent:
 
 ---
 
-## Step 3 — add regions (only when a distant user base has a real latency problem)
+## Step 3: add regions (only when a distant user base has a real latency problem)
 
 The trigger is evidence: users far from your region measure or report high latency, and step 1 co-location does not fix it because the distance to the single region is the problem. Then, and only then:
 
@@ -145,17 +145,17 @@ Do not split the schema per app. Split **reads from writes**, and classify each 
 | App                     | Reads                              | Writes                    |
 | ----------------------- | ---------------------------------- | ------------------------- |
 | `payments`              | From primary (must be consistent)  | Primary                   |
-| `auth` register / login | —                                  | Primary                   |
+| `auth` register / login |- | Primary                   |
 | `auth` token → user     | From local replica, or cached      | Primary (on register)     |
 | `ai_chat` history       | From local replica (lag is fine)   | Primary (append messages) |
 
-In code, this means two engines: a **writer** engine pointed at the primary and a **reader** engine pointed at the local replica. A read-only endpoint uses the reader; anything that writes uses the writer. Add this only in step 3 — it is needless complexity in one region.
+In code, this means two engines: a **writer** engine pointed at the primary and a **reader** engine pointed at the local replica. A read-only endpoint uses the reader; anything that writes uses the writer. Add this only in step 3. It is needless complexity in one region.
 
 ### What not to do
 
-- **Do not deploy compute to many regions while keeping one database with no replica.** Distant instances then pay the long round trip on every query — slower than one region. Local data is the entire point.
+- **Do not deploy compute to many regions while keeping one database with no replica.** Distant instances then pay the long round trip on every query: slower than one region. Local data is the entire point.
 - **Do not make the database multi-primary** to avoid write latency. That is expensive, complex, and wrong for payments and auth. If write latency for distant users ever becomes the binding constraint, write a new ADR for that specific case.
-- **Do not switch to Turso** to get edge reads unless the workload has genuinely become global and read-dominant — and even then, the async-dialect limitation in [ADR-0002](../docs/adr/0002-use-neon-postgres-for-persistence.md) applies.
+- **Do not switch to Turso** to get edge reads unless the workload has genuinely become global and read-dominant: and even then, the async-dialect limitation in [ADR-0002](../docs/adr/0002-use-neon-postgres-for-persistence.md) applies.
 
 ---
 
@@ -163,10 +163,10 @@ In code, this means two engines: a **writer** engine pointed at the primary and 
 
 | Phase                                          | What runs                                        | Approx. monthly cost      |
 | ---------------------------------------------- | ------------------------------------------------ | ------------------------- |
-| Step 1 — one region, Neon free                 | Cloud Run scale-to-zero + Neon free              | $0                        |
-| Step 1 + no cold starts                        | Cloud Run `--min-instances=1`                    | ~$10–15                   |
-| Step 2 — zero-hop database                     | Cloud SQL smallest instance, same region         | +$8–10                    |
-| Step 3 — two regions                           | Global LB + 2× Cloud Run + 1 read replica        | ~$18+ (LB) + replica cost |
+| Step 1, one region, Neon free                 | Cloud Run scale-to-zero + Neon free              | $0                        |
+| Step 1 + no cold starts                        | Cloud Run `--min-instances=1`                    | ~$10-15                   |
+| Step 2, zero-hop database                     | Cloud SQL smallest instance, same region         | +$8-10                    |
+| Step 3, two regions                           | Global LB + 2× Cloud Run + 1 read replica        | ~$18+ (LB) + replica cost |
 
 For a solo developer on a small budget, **step 1 is the answer for a long time.** Steps 2 and 3 are triggered by measured problems, not by planning.
 
@@ -185,7 +185,7 @@ Before you add a region, confirm all of these. If any is "no", you are not ready
 
 ## References
 
-- [ADR-0003 — the decision](../docs/adr/0003-single-region-now-multi-region-later.md)
-- [ADR-0002 — the database choice](../docs/adr/0002-use-neon-postgres-for-persistence.md)
+- [ADR-0003, the decision](../docs/adr/0003-single-region-now-multi-region-later.md)
+- [ADR-0002, the database choice](../docs/adr/0002-use-neon-postgres-for-persistence.md)
 - [Cloud Run: serving from multiple regions](https://cloud.google.com/run/docs/multiple-regions)
 - [Neon read replicas](https://neon.tech/docs/introduction/read-replicas)

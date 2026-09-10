@@ -1,10 +1,10 @@
-# Anuvia — FastAPI SaaS Starter
+# Anuvia: FastAPI SaaS Starter
 
-A **modular monolith** FastAPI template built for solo founders who want to ship multiple AI/SaaS products fast. Every new product is a folder. No microservice complexity — just a clean, deployable base that grows with you.
+A **modular monolith** FastAPI template built for solo founders who want to ship multiple AI/SaaS products fast. Every new product is a folder. No microservice complexity, just a clean, deployable base that grows with you.
 
 [![CI](https://github.com/YOUR_USERNAME/anuvia/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/anuvia/actions/workflows/ci.yml)
 
-> **Open source note:** This repository contains no secrets. All sensitive values (`SECRET_KEY`, `DATABASE_URL`, API keys) are injected at runtime via environment variables — locally through `.env` (git-ignored), in CI/CD through GitHub Secrets.
+> **Open source note:** This repository contains no secrets. All sensitive values (`SECRET_KEY`, `DATABASE_URL`, API keys) are injected at runtime via environment variables, locally through `.env` (git-ignored), in CI/CD through GitHub Secrets.
 
 ---
 
@@ -15,7 +15,7 @@ This README is the tour. The operating manual and the deep docs live alongside t
 | Document | Read it when |
 |---|---|
 | [`CLAUDE.md`](./CLAUDE.md) | **Start here.** The operating manual: rules, traps, and the multi-region decision. |
-| [`.github/instructions/`](./.github/instructions/) | Writing code — the rules, structure, standards, and architecture in full. |
+| [`.github/instructions/`](./.github/instructions/) | Writing code, the rules, structure, standards, and architecture in full. |
 | [`docs/local-development.md`](./docs/local-development.md) | Setting up or working locally. |
 | [`docs/testing.md`](./docs/testing.md) | Writing tests. |
 | [`docs/troubleshooting.md`](./docs/troubleshooting.md) | **Anything failing.** Symptom → cause → fix. |
@@ -51,11 +51,11 @@ Every product lives in `app/apps/<name>/`. Adding a new one means creating one f
 | Config | pydantic-settings | 2.6.1 |
 | Auth | python-jose (JWT) + bcrypt | 3.3.0 / 4.2.1 |
 | Local DB | aiosqlite (SQLite) | 0.20.0 |
-| Production DB | Neon (PostgreSQL serverless) | — |
+| Production DB | Neon (PostgreSQL serverless) |- |
 | HTTP client | httpx | 0.28.1 |
 | Linter | Ruff | 0.8.4 |
 | Testing | pytest + pytest-asyncio | 8.3.4 / 0.24.0 |
-| Deploy | Docker + Google Cloud Run | — |
+| Deploy | Docker + Google Cloud Run |- |
 
 ---
 
@@ -74,7 +74,7 @@ anuvia/
 │   ├── main.py              # FastAPI app entry point
 │   │
 │   ├── core/
-│   │   ├── config.py        # Pydantic Settings — reads all config from env vars
+│   │   ├── config.py        # Pydantic Settings, reads all config from env vars
 │   │   ├── database.py      # Async SQLAlchemy engine + get_db dependency
 │   │   ├── security.py      # bcrypt hashing + JWT create/decode
 │   │   ├── dependencies.py  # get_current_user FastAPI dependency
@@ -83,7 +83,7 @@ anuvia/
 │   │
 │   ├── models/
 │   │   ├── base.py          # DeclarativeBase + TimestampMixin (created_at, updated_at)
-│   │   └── user.py          # User table — shared across all apps
+│   │   └── user.py          # User table, shared across all apps
 │   │
 │   ├── schemas/
 │   │   ├── common.py        # HealthResponse, MessageResponse
@@ -99,7 +99,7 @@ anuvia/
 │       ├── auth/            # POST /auth/register, /login  GET /auth/me
 │       ├── payments/        # GET /payments/subscription
 │       ├── ai_chat/         # POST /ai-chat/chat
-│       └── playroom/        # /games/v1/... — the Playroom rooms API
+│       └── playroom/        # /games/v1/... the Playroom rooms API
 │           (each has router.py, service.py, models.py, schemas.py;
 │            playroom adds bingo.py, engines.py, serializers.py and more,
 │            because a game is more than four files. See its docstrings.)
@@ -113,7 +113,7 @@ anuvia/
 │   ├── test_auth.py         # Auth flow tests
 │   └── test_playroom.py     # Rooms API: turns, board visibility, win rules
 │
-├── .env.example             # Safe template — copy to .env, fill in real values
+├── .env.example             # Safe template, copy to .env, fill in real values
 ├── .gitignore               # .env, *.db, .venv, caches all excluded
 ├── Dockerfile               # Cloud Run ready (runs migrations on startup)
 ├── alembic.ini
@@ -130,10 +130,10 @@ anuvia/
 | File / Pattern | Why excluded |
 |---|---|
 | `.env` | Contains your real `SECRET_KEY`, `DATABASE_URL`, API keys |
-| `*.db` | Local SQLite database — contains real data |
+| `*.db` | Local SQLite database, contains real data |
 | `.venv/` | Local Python environment |
 
-The `.env.example` file is committed — it contains only placeholder values and documents which variables are needed.
+The `.env.example` file is committed, it contains only placeholder values and documents which variables are needed.
 
 ### How secrets flow
 
@@ -155,7 +155,7 @@ No secret ever touches the git repository.
 git clone https://github.com/YOUR_USERNAME/anuvia.git
 cd anuvia
 
-# Copy the template — this is the only file you need to fill in
+# Copy the template: this is the only file you need to fill in
 cp .env.example .env
 ```
 
@@ -192,7 +192,7 @@ Open `http://localhost:8000/docs` for the interactive API explorer.
 pytest tests/ -v
 ```
 
-Tests use an in-memory SQLite database — `.env` is not required to run them.
+Tests use an in-memory SQLite database. `.env` is not required to run them.
 
 ---
 
@@ -200,7 +200,7 @@ Tests use an in-memory SQLite database — `.env` is not required to run them.
 
 **Why not Turso?** Turso uses a custom `libsql` dialect for SQLAlchemy that is sync-only. This project uses `create_async_engine` throughout, which requires an async-capable database driver. Neon is a free serverless PostgreSQL provider with first-class async SQLAlchemy support via `asyncpg`.
 
-> Local development still uses SQLite (`aiosqlite`) — no change there. Only the production `DATABASE_URL` differs.
+> Local development still uses SQLite (`aiosqlite`): no change there. Only the production `DATABASE_URL` differs.
 
 ### 1. Create a free Neon account
 
@@ -228,10 +228,10 @@ It outputs a string in this format:
 postgresql+asyncpg://user:password@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require
 ```
 
-> **Important — Neon may give you a plain `postgresql://` string instead of `postgresql+asyncpg://`.** If the dashboard does not offer an asyncpg-specific option, or gives you a URL starting with `postgresql://`, you must manually adjust it before use:
+> **Important. Neon may give you a plain `postgresql://` string instead of `postgresql+asyncpg://`.** If the dashboard does not offer an asyncpg-specific option, or gives you a URL starting with `postgresql://`, you must manually adjust it before use:
 >
 > 1. Change `postgresql://` → `postgresql+asyncpg://`
-> 2. Remove the `?sslmode=require` (and any other query params like `channel_binding=require`) — asyncpg does not accept these; SSL is already enforced in `database.py` via `connect_args`.
+> 2. Remove the `?sslmode=require` (and any other query params like `channel_binding=require`), asyncpg does not accept these; SSL is already enforced in `database.py` via `connect_args`.
 >
 > **Before (what Neon gives you):**
 > ```
@@ -255,14 +255,14 @@ DATABASE_URL=postgresql+asyncpg://user:password@ep-xxx.us-east-2.aws.neon.tech/n
 alembic upgrade head
 ```
 
-Alembic connects to Neon and creates all tables. The SSL connection is handled automatically — `database.py` detects the `postgresql` prefix and adds `ssl=require` to the connection args.
+Alembic connects to Neon and creates all tables. The SSL connection is handled automatically. `database.py` detects the `postgresql` prefix and adds `ssl=require` to the connection args.
 
 ### Where to put the DATABASE_URL
 
 | Environment | Where to set it |
 |---|---|
-| Local dev | `.env` file (already git-ignored) — use the SQLite default |
-| GitHub CI | Not needed — CI uses in-memory SQLite |
+| Local dev | `.env` file (already git-ignored), use the SQLite default |
+| GitHub CI | Not needed, CI uses in-memory SQLite |
 | Production | GitHub Secret named `DATABASE_URL` → injected into Cloud Run at deploy |
 
 ---
@@ -273,15 +273,15 @@ All variables are read from the environment by `app/core/config.py` using Pydant
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `SECRET_KEY` | **Yes** | — | JWT signing key. Min 32 chars. Generate with `secrets.token_hex(32)`. |
+| `SECRET_KEY` | **Yes** |- | JWT signing key. Min 32 chars. Generate with `secrets.token_hex(32)`. |
 | `DATABASE_URL` | No | `sqlite+aiosqlite:///./local.db` | SQLAlchemy async connection string |
 | `APP_NAME` | No | `anuvia` | Displayed in API docs |
 | `APP_ENV` | No | `development` | Set to `production` to disable `/docs` |
 | `DEBUG` | No | `false` | Enables SQLAlchemy query logging |
 | `ALGORITHM` | No | `HS256` | JWT signing algorithm |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | No | `30` | JWT lifetime in minutes |
-| `STRIPE_SECRET_KEY` | No | — | Stripe payments integration |
-| `STRIPE_WEBHOOK_SECRET` | No | — | Stripe webhook signature verification |
+| `STRIPE_SECRET_KEY` | No |- | Stripe payments integration |
+| `STRIPE_WEBHOOK_SECRET` | No |- | Stripe webhook signature verification |
 
 ### Database URL formats
 
@@ -289,7 +289,7 @@ All variables are read from the environment by `app/core/config.py` using Pydant
 # Local development (SQLite, no setup needed)
 DATABASE_URL=sqlite+aiosqlite:///./local.db
 
-# Production (Neon — serverless PostgreSQL, see "Setting Up Neon" section for how to build this string)
+# Production (Neon: serverless PostgreSQL, see "Setting Up Neon" section for how to build this string)
 DATABASE_URL=postgresql+asyncpg://user:password@ep-xxx.us-east-2.aws.neon.tech/neondb
 ```
 
@@ -302,14 +302,14 @@ DATABASE_URL=postgresql+asyncpg://user:password@ep-xxx.us-east-2.aws.neon.tech/n
 | Trigger | Workflow | What it does |
 |---|---|---|
 | Every push, every PR into `main` | `ci.yml` | Ruff lint + format check + pytest, and a Docker build + container smoke test. On a PR, also applies the migrations to a throwaway Neon branch |
-| PR into `main`, push to `main`, weekly | `codeql.yml` | CodeQL static security analysis (free — the repo is public) |
+| PR into `main`, push to `main`, weekly | `codeql.yml` | CodeQL static security analysis (free, the repo is public) |
 | Push to `main` | `deploy.yml` | Builds Docker image, pushes to Artifact Registry, deploys to Cloud Run |
 
-The gate (`ci.yml` + `codeql.yml`) uses dummy secrets and SQLite — it never needs real credentials, so a fork's PR still runs. The three required checks are `Lint & Test`, `Docker image builds`, and `Analyze python`.
+The gate (`ci.yml` + `codeql.yml`) uses dummy secrets and SQLite. It never needs real credentials, so a fork's PR still runs. The three required checks are `Lint & Test`, `Docker image builds`, and `Analyze python`.
 
-The deploy workflow reads real secrets from GitHub and injects them as Cloud Run environment variables at deploy time. It also runs `alembic upgrade head` once, before the new revision goes live — the container itself does not migrate on boot.
+The deploy workflow reads real secrets from GitHub and injects them as Cloud Run environment variables at deploy time. It also runs `alembic upgrade head` once, before the new revision goes live. The container itself does not migrate on boot.
 
-**Optional fourth check — `Migrations (Neon branch)`.** On a pull request it clones your Neon production branch (copy-on-write: same schema, same data, free while idle), applies the pull request's migrations to it, and deletes the branch afterwards. It catches a migration that breaks against the real PostgreSQL schema, which the SQLite tests cannot. It is not required and skips itself on forks and wherever Neon is not configured. To enable it, set:
+**Optional fourth check: `Migrations (Neon branch)`.** On a pull request it clones your Neon production branch (copy-on-write: same schema, same data, free while idle), applies the pull request's migrations to it, and deletes the branch afterwards. It catches a migration that breaks against the real PostgreSQL schema, which the SQLite tests cannot. It is not required and skips itself on forks and wherever Neon is not configured. To enable it, set:
 
 | Name | Kind | Value |
 |---|---|---|
@@ -321,7 +321,7 @@ The deploy workflow reads real secrets from GitHub and injects them as Cloud Run
 
 Go to your repository → **Settings** → **Secrets and variables** → **Actions**.
 
-#### Variables (non-sensitive — visible in logs)
+#### Variables (non-sensitive: visible in logs)
 
 Click **Variables** → **New repository variable**:
 
@@ -333,7 +333,7 @@ Click **Variables** → **New repository variable**:
 | `APP_NAME` | `anuvia` | Application name passed to the container |
 | `ARTIFACT_REPOSITORY` | `containers` | Artifact Registry repository name |
 
-#### Secrets (sensitive — masked in logs, never visible after saving)
+#### Secrets (sensitive: masked in logs, never visible after saving)
 
 Click **Secrets** → **New repository secret**:
 
@@ -341,12 +341,12 @@ Click **Secrets** → **New repository secret**:
 |---|---|
 | `WIF_PROVIDER` | Workload Identity provider resource name (`projects/NUMBER/.../providers/github-provider`) |
 | `WIF_SERVICE_ACCOUNT` | Deployer service account email (`github-deployer@…iam.gserviceaccount.com`) |
-| `SECRET_KEY` | JWT signing secret — run `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `SECRET_KEY` | JWT signing secret, run `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `DATABASE_URL` | Your Neon connection string (copy from Neon dashboard → Connect → SQLAlchemy asyncpg) |
-| `STRIPE_SECRET_KEY` | Your Stripe secret key (optional — leave empty if not using payments) |
+| `STRIPE_SECRET_KEY` | Your Stripe secret key (optional, leave empty if not using payments) |
 | `STRIPE_WEBHOOK_SECRET` | Your Stripe webhook secret (optional) |
 
-There is **no** `GCP_SA_KEY` — the deploy authenticates without a key (see below). The two `WIF_*` values are not truly sensitive; they are kept as secrets to match the `nextjs-cloudrun-template`. Variables would also work if `deploy.yml` reads `${{ vars.WIF_* }}`.
+There is **no** `GCP_SA_KEY`, the deploy authenticates without a key (see below). The two `WIF_*` values are not truly sensitive; they are kept as secrets to match the `nextjs-cloudrun-template`. Variables would also work if `deploy.yml` reads `${{ vars.WIF_* }}`.
 
 ### Creating the GCP Service Account (keyless)
 
@@ -405,7 +405,7 @@ Set **Branch name pattern** to `main`, then enable:
 | Setting | Value | Why |
 |---|---|---|
 | Require a pull request before merging | ✅ | No direct pushes to main |
-| Required approving reviews | `0` | Solo founder — no second reviewer needed, PR is still required |
+| Required approving reviews | `0` | Solo founder. No second reviewer needed, PR is still required |
 | Require status checks to pass before merging | ✅ | CI must be green before merge |
 | Status checks to require | `Lint & Test`, `Docker image builds`, `Analyze python` | The job names in `ci.yml` and `codeql.yml` |
 | Require branches to be up to date | ✅ | Branch must be current with main before merging |
@@ -436,7 +436,7 @@ git checkout -b feat/my-change
 
 # 2. Make your changes
 
-# 3. Test locally with Docker against Neon (migrate first — the CMD does not)
+# 3. Test locally with Docker against Neon (migrate first: the CMD does not)
 docker build -t anuvia .
 docker run --rm --env-file .env.docker anuvia alembic upgrade head
 docker run --env-file .env.docker -p 8080:8080 anuvia
@@ -448,7 +448,7 @@ git push -u origin feat/my-change
 # 5. Open a PR (GitHub UI or CLI)
 gh pr create --title "feat: my change" --body "What and why"
 
-# 6. CI runs automatically — Ruff + pytest must pass (green checkmark)
+# 6. CI runs automatically: Ruff + pytest must pass (green checkmark)
 
 # 7. Merge the PR
 gh pr merge --squash   # or merge via GitHub UI
@@ -457,13 +457,13 @@ gh pr merge --squash   # or merge via GitHub UI
 #    → Docker image built, pushed to Artifact Registry, deployed to Cloud Run
 ```
 
-The deploy only happens when the PR is merged — never on feature branches.
+The deploy only happens when the PR is merged, never on feature branches.
 
 ---
 
 ## Local Docker Testing (Production-like)
 
-Run the exact same Docker image locally but pointed at Neon — no SQLite, no dev shortcuts. This is the fastest way to catch environment issues before pushing to Cloud Run.
+Run the exact same Docker image locally but pointed at Neon: no SQLite, no dev shortcuts. This is the fastest way to catch environment issues before pushing to Cloud Run.
 
 ### 1. Copy the env template
 
@@ -485,7 +485,7 @@ DATABASE_URL=postgresql+asyncpg://user:password@ep-xxx.us-east-2.aws.neon.tech/n
 
 > `.env.docker` is git-ignored. Never commit it. It contains real credentials.
 
-`APP_ENV=development` enables `/docs` and `/redoc` so you can explore the API in the browser. `DEBUG=true` enables SQLAlchemy's echo mode — every SQL query is printed to stdout as it runs.
+`APP_ENV=development` enables `/docs` and `/redoc` so you can explore the API in the browser. `DEBUG=true` enables SQLAlchemy's echo mode, every SQL query is printed to stdout as it runs.
 
 ### 3. Build the image
 
@@ -500,7 +500,7 @@ docker run --rm --env-file .env.docker anuvia alembic upgrade head
 docker run --env-file .env.docker -p 8080:8080 anuvia
 ```
 
-Two commands, because that is exactly what the deploy does: migrate once, then serve. The container `CMD` starts Uvicorn only — migrations belong to the `Run database migrations` step in `deploy.yml`, so that Cloud Run instances cannot race on them at boot. Skip the first command against a fresh database and any route touching a table returns 500. Logs stream directly to your terminal.
+Two commands, because that is exactly what the deploy does: migrate once, then serve. The container `CMD` starts Uvicorn only, migrations belong to the `Run database migrations` step in `deploy.yml`, so that Cloud Run instances cannot race on them at boot. Skip the first command against a fresh database and any route touching a table returns 500. Logs stream directly to your terminal.
 
 ### 5. Test it
 
@@ -529,7 +529,7 @@ Every HTTP request and every SQL query is printed. To filter just SQL: `docker r
 | Database | SQLite (`.env` default) | Neon PostgreSQL |
 | `/docs` | Enabled | Enabled (`APP_ENV=development`) |
 | SQL query logs | Only if `DEBUG=true` in `.env` | Always on (`DEBUG=true` in `.env.docker`) |
-| Hot reload | Yes | No — rebuild image after code changes |
+| Hot reload | Yes | No, rebuild image after code changes |
 | Matches Cloud Run | No | Yes (same image, same DB) |
 | Use when | Day-to-day coding | Debugging prod issues locally |
 
@@ -564,7 +564,7 @@ gcloud run deploy anuvia \
 
 ### Production checklist
 
-- [ ] `APP_ENV=production` — disables `/docs` and `/redoc`
+- [ ] `APP_ENV=production`, disables `/docs` and `/redoc`
 - [ ] `SECRET_KEY` is at least 32 random characters
 - [ ] `DATABASE_URL` points to Neon PostgreSQL (not local SQLite)
 - [ ] Deploy is keyless (Workload Identity Federation); no `GCP_SA_KEY` exists and any old key is deleted
@@ -586,8 +586,8 @@ Each `router.py` declares its own URL prefix and Swagger tag:
 from fastapi import APIRouter
 
 router = APIRouter()
-PREFIX = "/my-product"   # URL prefix — defaults to /<folder-name> if omitted
-TAGS  = ["my-product"]   # Swagger group — defaults to [folder-name] if omitted
+PREFIX = "/my-product"   # URL prefix, defaults to /<folder-name> if omitted
+TAGS  = ["my-product"]   # Swagger group, defaults to [folder-name] if omitted
 
 @router.get("/hello")
 async def hello():
@@ -599,13 +599,13 @@ async def hello():
 ```
 HTTP Request
     ↓
-Router   (app/apps/<name>/router.py)   — validates input shape, calls service
+Router   (app/apps/<name>/router.py), validates input shape, calls service
     ↓
-Service  (app/apps/<name>/service.py)  — all business logic lives here
+Service  (app/apps/<name>/service.py), all business logic lives here
     ↓
-Repository  (app/repositories/*.py)    — all DB queries live here
+Repository  (app/repositories/*.py), all DB queries live here
     ↓
-Database    (app/core/database.py)     — SQLAlchemy async session
+Database    (app/core/database.py), SQLAlchemy async session
 ```
 
 Routers never contain business logic. Services never write raw SQL. Repositories never know about HTTP.
@@ -615,7 +615,7 @@ Routers never contain business logic. Services never write raw SQL. Repositories
 **Flow:**
 1. `POST /auth/register` → creates user, returns user object
 2. `POST /auth/login` → verifies password, returns `access_token`
-3. Protected endpoints use `Depends(get_current_user)` — FastAPI injects the authenticated `User`
+3. Protected endpoints use `Depends(get_current_user)`, FastAPI injects the authenticated `User`
 
 **How to protect an endpoint:**
 
@@ -703,7 +703,7 @@ class ResumeService:
         ...
 ```
 
-Restart the server — the router is live at `/resume/generate`. No other files touched.
+Restart the server. The router is live at `/resume/generate`. No other files touched.
 
 If your new app has its own DB tables, import the models in `alembic/env.py` and run:
 
@@ -751,7 +751,7 @@ pytest tests/ -v
 pytest tests/test_auth.py -v
 ```
 
-Tests use an isolated in-memory SQLite database per test — no `.env` needed, no side effects.
+Tests use an isolated in-memory SQLite database per test: no `.env` needed, no side effects.
 
 To add tests for a new app:
 
@@ -821,8 +821,8 @@ Add `ANTHROPIC_API_KEY` to `.env.example`, `app/core/config.py`, and as a GitHub
 ## Contributing
 
 1. Fork and clone
-2. `cp .env.example .env` — fill in your own values
-3. `pre-commit install` — enables auto-lint on commit
+2. `cp .env.example .env`, fill in your own values
+3. `pre-commit install`: enables auto-lint on commit
 4. Make your changes in a feature branch
 5. `pytest tests/ -v` must pass before opening a PR
-6. Open a PR — CI runs automatically
+6. Open a PR, CI runs automatically

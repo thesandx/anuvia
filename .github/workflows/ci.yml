@@ -2,13 +2,13 @@ name: CI
 
 # The pre-merge gate. Runs on every pull request into main, on direct pushes
 # to main as a safety net, and on any branch push for fast feedback. Nothing
-# here touches Google Cloud, so the jobs need no cloud credentials — keep it
+# here touches Google Cloud, so the jobs need no cloud credentials, keep it
 # that way so a fork's pull request still runs.
 #
 # `Lint & Test` and `Docker image builds` run everywhere, on SQLite, with no
 # external service. `Migrations (Neon branch)` is the one job that reaches out:
 # it needs Neon credentials, so it skips itself on forks and on repositories
-# that have not configured Neon. It must stay optional for that reason — see
+# that have not configured Neon. It must stay optional for that reason: see
 # .github/instructions/github-workflows.md.
 on:
   push:
@@ -74,7 +74,7 @@ jobs:
 
       - name: Build image
         # Proves the production image still builds on every pull request.
-        # Nothing is pushed — a broken Dockerfile should fail review, not
+        # Nothing is pushed. A broken Dockerfile should fail review, not
         # deploy day.
         uses: docker/build-push-action@v6
         with:
@@ -95,7 +95,7 @@ jobs:
         # image CMD no longer migrates (see the Dockerfile), so the migration
         # is an explicit `docker run ... alembic upgrade head` that overrides
         # it. Both containers share a volume so the server sees the migrated
-        # database. SQLite keeps the job free of any external database — the
+        # database. SQLite keeps the job free of any external database. The
         # same choice the unit tests make.
         run: |
           set -euo pipefail
@@ -103,13 +103,13 @@ jobs:
           DATA_DIR="${RUNNER_TEMP}/smoke"
           mkdir -p "$DATA_DIR"
 
-          # Step 1 — migrate (the deploy-time step, run locally).
+          # Step 1, migrate (the deploy-time step, run locally).
           docker run --rm -v "${DATA_DIR}:/data" \
             -e SECRET_KEY=ci-smoke-secret-not-used-in-production \
             -e DATABASE_URL="sqlite+aiosqlite:////data/smoke.db" \
             "$IMAGE" alembic upgrade head
 
-          # Step 2 — serve, against the schema step 1 created.
+          # Step 2, serve, against the schema step 1 created.
           docker run -d --name smoke -p 8080:8080 -v "${DATA_DIR}:/data" \
             -e PORT=8080 \
             -e APP_ENV=production \
@@ -165,7 +165,7 @@ jobs:
 
       # A Neon branch is a copy-on-write clone of the production branch: same
       # schema, same data, created in seconds and costing nothing while idle.
-      # Running the migration against it is the check SQLite cannot give us —
+      # Running the migration against it is the check SQLite cannot give us,
       # it proves the new migration applies to the REAL production schema.
       - name: Create a Neon branch for this pull request
         id: neon_branch

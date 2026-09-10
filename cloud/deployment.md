@@ -37,7 +37,7 @@ done
 
 ### 3. Set up keyless auth (Workload Identity Federation)
 
-The pipeline authenticates with no key. Create a workload identity pool and a provider bound to this repository, then let the pool impersonate the deployer service account. The full command set — pool, provider, binding, and the resulting `WIF_PROVIDER` value — is in [github-actions.md](./github-actions.md).
+The pipeline authenticates with no key. Create a workload identity pool and a provider bound to this repository, then let the pool impersonate the deployer service account. The full command set, pool, provider, binding, and the resulting `WIF_PROVIDER` value, is in [github-actions.md](./github-actions.md).
 
 Do **not** create a service account key. A key is a long-lived bearer credential; federation replaces it with a short-lived token.
 
@@ -66,11 +66,11 @@ Repository → Settings → Secrets and variables → Actions.
 | `STRIPE_SECRET_KEY`     | Optional                                           |
 | `STRIPE_WEBHOOK_SECRET` | Optional                                           |
 
-There is no `GCP_SA_KEY` — the deploy is keyless. The two `WIF_*` values are not truly sensitive (a resource path and an SA email); they are kept as secrets to mirror the `nextjs-cloudrun-template`. Plain variables would also work if `deploy.yml` reads `${{ vars.WIF_* }}`.
+There is no `GCP_SA_KEY`. The deploy is keyless. The two `WIF_*` values are not truly sensitive (a resource path and an SA email); they are kept as secrets to mirror the `nextjs-cloudrun-template`. Plain variables would also work if `deploy.yml` reads `${{ vars.WIF_* }}`.
 
 ### 5. Enable branch protection on `main`
 
-Require a pull request and the passing gate checks — `Lint & Test`, `Docker image builds`, and `Analyze python` — before merge. The README "Branch Protection" section has the exact settings and the CLI command.
+Require a pull request and the passing gate checks, `Lint & Test`, `Docker image builds`, and `Analyze python`, before merge. The README "Branch Protection" section has the exact settings and the CLI command.
 
 ---
 
@@ -96,7 +96,7 @@ gcloud run deploy anuvia \
   --image $IMAGE:$(git rev-parse HEAD) \
   --region us-central1 --platform managed --allow-unauthenticated --port 8080 \
   --set-env-vars "APP_ENV=production,DEBUG=false,APP_NAME=anuvia" \
-  --set-env-vars "SECRET_KEY=...,DATABASE_URL=postgresql+asyncpg://..."
+  --set-env-vars "SECRET_KEY=...DATABASE_URL=postgresql+asyncpg://..."
 ```
 
 Deploy the SHA tag, never `latest`. A revision pinned to a moving tag cannot be traced to a commit.
@@ -105,7 +105,7 @@ Deploy the SHA tag, never `latest`. A revision pinned to a moving tag cannot be 
 
 ## Migrations
 
-Migrations run **once per deploy**, as the `Run database migrations` step in `deploy.yml`, after the image is pushed and before `gcloud run deploy`. The container `CMD` starts Uvicorn only — it does not migrate.
+Migrations run **once per deploy**, as the `Run database migrations` step in `deploy.yml`, after the image is pushed and before `gcloud run deploy`. The container `CMD` starts Uvicorn only. It does not migrate.
 
 The step runs `alembic upgrade head` inside the image being deployed, so the migration uses exactly the code and pinned dependencies of the new revision:
 
@@ -138,7 +138,7 @@ gcloud run services describe anuvia --region us-central1 --format 'value(status.
 curl https://YOUR_SERVICE_URL/health        # {"status":"ok","app":"anuvia"}
 ```
 
-`/docs` returns 404 in production — that is correct (`APP_ENV=production`). Check the logs in Cloud Logging or:
+`/docs` returns 404 in production. That is correct (`APP_ENV=production`). Check the logs in Cloud Logging or:
 
 ```bash
 gcloud run services logs read anuvia --region us-central1 --limit 50
@@ -177,5 +177,5 @@ Because each revision is tied to an immutable SHA-tagged image, you always know 
 - [ ] Neon project is in the same geography as `GCP_REGION`.
 - [ ] Branch protection on `main` requires `Lint & Test`, `Docker image builds`, and `Analyze python`.
 - [ ] *(Optional)* `NEON_API_KEY` secret and `NEON_PROJECT_ID` variable set, so pull requests test migrations against a Neon branch.
-- [ ] CORS origins restricted to your real frontend (before real users) — see [SECURITY.md](../SECURITY.md).
+- [ ] CORS origins restricted to your real frontend (before real users): see [SECURITY.md](../SECURITY.md).
 - [ ] A budget alert is set.

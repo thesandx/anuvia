@@ -2,7 +2,7 @@
 
 **Read this file completely before you make any change.** It is the operating manual for AI coding assistants (Claude Code, Copilot, Cursor, ChatGPT) and new human contributors in this repository.
 
-It exists because several things here look wrong but are correct. Several obvious "improvements" break the build or the deploy. [Traps](#traps--things-that-look-wrong-and-are-not) and [Never do this](#never-do-this) record them. Both sections come from real behaviour of this stack, not speculation.
+It exists because several things here look wrong but are correct. Several obvious "improvements" break the build or the deploy. [Traps](#traps-things-that-look-wrong-and-are-not) and [Never do this](#never-do-this) record them. Both sections come from real behaviour of this stack, not speculation.
 
 ---
 
@@ -12,11 +12,11 @@ It exists because several things here look wrong but are correct. Several obviou
 2. [Verified state](#verified-state)
 3. [Documentation map](#documentation-map)
 4. [Commands](#commands)
-5. [The ten rules](#the-ten-rules)
+5. [The eleven rules](#the-eleven-rules)
 6. [Where files go](#where-files-go)
 7. [Architecture in brief](#architecture-in-brief)
 8. [The multi-region decision](#the-multi-region-decision)
-9. [Traps — things that look wrong and are not](#traps--things-that-look-wrong-and-are-not)
+9. [Traps, things that look wrong and are not](#traps-things-that-look-wrong-and-are-not)
 10. [Never do this](#never-do-this)
 11. [Task recipes](#task-recipes)
 12. [Verification protocol](#verification-protocol)
@@ -35,7 +35,7 @@ The stack is async end to end: FastAPI, SQLAlchemy 2.0 async, Alembic, Pydantic 
 The purpose is that **the path to production already works**: a container that runs on Cloud Run, a pipeline that deploys it, and documentation that explains each decision. Adding a product must not degrade that path. Keep the reusable base clean.
 
 The apps today are `auth`, `payments`, `ai_chat` (still the echo stub) and
-**`playroom`** — the rooms API behind the Playroom party-games frontend. Its
+**`playroom`**, the rooms API behind the Playroom party-games frontend. Its
 full contract is `docs/backend-handover.md` in the `games` repository; read that
 before you change any payload shape, because the Next.js client reads the
 `Room` object by field name and a rename is a breaking change.
@@ -59,13 +59,13 @@ These versions are pinned in `requirements.txt` and are known to work together. 
 | bcrypt              | `4.2.1`    | Password hashing                                 |
 | asyncpg             | `0.30.0`   | Production PostgreSQL driver (Neon)              |
 | aiosqlite           | `0.20.0`   | Local and test SQLite driver                     |
-| Ruff                | `0.8.4`    | Lint **and** format — the only style tool        |
+| Ruff                | `0.8.4`    | Lint **and** format, the only style tool        |
 | pytest              | `8.3.4`    | `asyncio_mode = "auto"`                          |
 
 **Measured facts:**
 
-- The container starts Uvicorn on `$PORT` and nothing else. Migrations run once, as a deploy-time step in `deploy.yml`, before the new revision is deployed — see [Trap 6](#trap-6).
-- `/health` returns `{"status": "ok", "app": "anuvia", ...}`, including `deployed_at` — the last deploy time in IST, or `null` in local dev.
+- The container starts Uvicorn on `$PORT` and nothing else. Migrations run once, as a deploy-time step in `deploy.yml`, before the new revision is deployed: see [Trap 6](#trap-6).
+- `/health` returns `{"status": "ok", "app": "anuvia", ...}`, including `deployed_at`, the last deploy time in IST, or `null` in local dev.
 - Tests run on in-memory SQLite. They need no `.env` and no network.
 - `docs` and `redoc` are disabled when `APP_ENV=production`.
 
@@ -78,7 +78,7 @@ This file is the index and the warnings. The detail lives in `.github/instructio
 | Read this                                                                    | Before                                                        |
 | ---------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | [`.github/instructions/coding-rules.md`](./.github/instructions/coding-rules.md)         | Writing anything. The non-negotiables in full.    |
-| [`.github/instructions/project-structure.md`](./.github/instructions/project-structure.md) | Creating any file — it decides where it goes.   |
+| [`.github/instructions/project-structure.md`](./.github/instructions/project-structure.md) | Creating any file. It decides where it goes.   |
 | [`.github/instructions/coding-standards.md`](./.github/instructions/coding-standards.md) | Writing Python, an endpoint, a model, or a query.   |
 | [`.github/instructions/architecture.md`](./.github/instructions/architecture.md)         | Adding a layer, a dependency, or a new app.       |
 | [`.github/instructions/deployment.md`](./.github/instructions/deployment.md)             | Touching the `Dockerfile`, env vars, or migrations. |
@@ -108,7 +108,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload        # dev server, hot reload, SQLite
 open http://localhost:8000/docs      # interactive API explorer
 
-# The gate — run before you claim work is done
+# The gate: run before you claim work is done
 ruff check .                         # lint
 ruff format --check .                # format check
 pytest tests/ -v                     # tests (in-memory SQLite)
@@ -130,20 +130,53 @@ The three gate commands (`ruff check`, `ruff format --check`, `pytest`) are exac
 
 ---
 
-## The ten rules
+## The eleven rules
 
 Full reasoning in [`coding-rules.md`](./.github/instructions/coding-rules.md).
 
 1. **Never break the folder structure.** The layout is fixed: `app/core/`, `app/models/`, `app/schemas/`, `app/repositories/`, `app/apps/<name>/`, `app/utils/`. Do not invent `src/`, a root `services/`, or a second `helpers/`. A product goes in `app/apps/<name>/` and nowhere else.
-2. **One app is one folder with four files.** `router.py`, `service.py`, `models.py`, `schemas.py`. Adding a product never edits `main.py` — the [auto-loader](#trap-1) finds the router.
+2. **One app is one folder with four files.** `router.py`, `service.py`, `models.py`, `schemas.py`. Adding a product never edits `main.py`. The [auto-loader](#trap-1) finds the router.
 3. **Respect the layers.** `router` → `service` → `repository` → database. A router holds no business logic. A service writes no raw SQL by hand where a repository fits. A repository knows nothing about HTTP. See [Architecture](#architecture-in-brief).
 4. **Read configuration only through `app/core/config.py`.** Never call `os.environ` or `os.getenv` elsewhere. `Settings` validates every value once, at startup. A missing `SECRET_KEY` must fail loudly on boot, not silently at request time.
-5. **Async all the way down.** Every route, service, and repository method is `async def`. Every DB call is `await`ed. Never call a blocking library (a sync DB driver, `requests`, `time.sleep`) inside a request — it stalls the event loop. Use `httpx.AsyncClient` and give every outbound call a timeout.
+5. **Async all the way down.** Every route, service, and repository method is `async def`. Every DB call is `await`ed. Never call a blocking library (a sync DB driver, `requests`, `time.sleep`) inside a request: it stalls the event loop. Use `httpx.AsyncClient` and give every outbound call a timeout.
 6. **Write production-quality code.** Handle the error path. Raise `HTTPException` with the right status at the boundary. No stub that returns fake data in a merged PR (the `ai_chat` echo is the one known, documented stub). No secret in source, a test, or a comment.
 7. **Validate at the boundary with Pydantic.** Request bodies and responses are Pydantic models, never raw dicts. Set `response_model` on every route. Use `EmailStr` for email. Never return an ORM object the response schema did not shape.
 8. **Migrations are the only way the schema changes.** Change a model, then `alembic revision --autogenerate`, then read the generated file before you commit it. Import every new model module in `alembic/env.py` or the migration will miss the table.
 9. **Avoid unnecessary dependencies.** Check the standard library first (`secrets`, `hashlib`, `datetime`, `uuid`, `functools`). See [Dependency policy](#dependency-policy).
-10. **Update docs when architecture or behaviour changes** — same PR, not later. A new env var touches four files (see [Task recipes](#add-an-environment-variable)). Write docs in short, plain, present-tense English.
+10. **Never use an em dash or an en dash (U+2014, U+2013), anywhere.** Not in code, comments, documentation, commit messages, or copy a reader sees. A comma for an aside, a colon for an explanation, a full stop for two statements that stand alone, a hyphen for a range. See [Never use an em dash](#never-use-an-em-dash).
+11. **Update docs when architecture or behaviour changes**: same PR, not later. A new env var touches four files (see [Task recipes](#add-an-environment-variable-four-places-one-pr)). Write docs in short, plain, present-tense English.
+
+
+## Never use an em dash
+
+The characters are U+2014 (em dash) and U+2013 (en dash). Neither belongs in
+this repository: not in code, not in comments, not in documentation, not in a
+commit message, not in copy a reader sees.
+
+This section names them by codepoint rather than printing them, so the check
+below stays honest.
+
+Use the punctuation that carries what the dash was standing in for:
+
+| Instead of                               | Write                          |
+| ---------------------------------------- | ------------------------------ |
+| An aside in the middle of a clause       | A pair of commas, or brackets  |
+| A clause that explains the one before it | A colon                        |
+| Two statements that each stand alone     | A full stop, and two sentences |
+| A range, such as 3 to 8 players          | A hyphen, or the word `to`     |
+
+A full stop is usually the right answer here, because short sentences are
+already the house style.
+
+Check before you commit:
+
+```bash
+git grep -nP '\x{2014}|\x{2013}' -- . ':!games/_ds' ':!.claude/skills/neon*'
+```
+
+Vendored material is excluded on purpose. `games/_ds` is an extracted design
+system and `.claude/skills/neon*` comes from upstream. Rewriting either would
+only make it drift from its source.
 
 ---
 
@@ -168,7 +201,7 @@ Full reasoning in [`coding-rules.md`](./.github/instructions/coding-rules.md).
 
 **Naming:** modules `snake_case.py`; classes `PascalCase`; functions and variables `snake_case`; tests `test_<subject>.py`; app folders `snake_case` (this becomes the URL prefix by default).
 
-**Imports are always absolute** from the `app` package — `from app.core.config import settings`, never `from ...core.config import settings`. Ruff's import sort (`I`) enforces ordering. Run `ruff check . --fix` rather than hand-sorting.
+**Imports are always absolute** from the `app` package, `from app.core.config import settings`, never `from ...core.config import settings`. Ruff's import sort (`I`) enforces ordering. Run `ruff check . --fix` rather than hand-sorting.
 
 ---
 
@@ -204,9 +237,9 @@ HTTP request
 
 This is a recorded decision, not an open question. Full reasoning and the runbook are in [ADR-0003](./docs/adr/0003-single-region-now-multi-region-later.md) and [`cloud/multi-region.md`](./cloud/multi-region.md). The short version, because contributors keep asking:
 
-**1. Run single-region now. Co-locate the app and the database.** Deploy Cloud Run and the Neon project in the **same geography** (for example both in `us-east`). The dominant latency in this app is the round trip between the app and the database — a single request runs several queries. Put them far apart and every request pays that distance several times. Put them together and the problem disappears. This costs about **$0** on the Cloud Run and Neon free tiers.
+**1. Run single-region now. Co-locate the app and the database.** Deploy Cloud Run and the Neon project in the **same geography** (for example both in `us-east`). The dominant latency in this app is the round trip between the app and the database. A single request runs several queries. Put them far apart and every request pays that distance several times. Put them together and the problem disappears. This costs about **$0** on the Cloud Run and Neon free tiers.
 
-**2. Keep PostgreSQL. Do not switch to SQLite or Turso.** The whole stack is async (`asyncpg`, `aiosqlite`). Turso's SQLAlchemy dialect is **sync-only**, so it does not fit `create_async_engine`. A local SQLite file on Cloud Run does not persist — the filesystem is ephemeral and instances do not share it — so app-local SQLite loses data. SQLite is correct for local development and tests, and wrong for a multi-instance production server. This is settled in [ADR-0002](./docs/adr/0002-use-neon-postgres-for-persistence.md).
+**2. Keep PostgreSQL. Do not switch to SQLite or Turso.** The whole stack is async (`asyncpg`, `aiosqlite`). Turso's SQLAlchemy dialect is **sync-only**, so it does not fit `create_async_engine`. A local SQLite file on Cloud Run does not persist, the filesystem is ephemeral and instances do not share it, so app-local SQLite loses data. SQLite is correct for local development and tests, and wrong for a multi-instance production server. This is settled in [ADR-0002](./docs/adr/0002-use-neon-postgres-for-persistence.md).
 
 **3. "Multi-region based on app type" means read/write splitting, not a database per app.** Do not shard the schema by product. When you genuinely need multiple regions, classify each app by its consistency need:
 
@@ -229,7 +262,7 @@ The other blocker is **fixed**: migrations no longer run in the container start 
 
 ---
 
-## Traps — things that look wrong and are not
+## Traps: things that look wrong and are not
 
 Every item here reflects real behaviour of this stack. Do not "fix" any of them without reading the reason.
 
@@ -243,7 +276,7 @@ Every item here reflects real behaviour of this stack. Do not "fix" any of them 
 
 ### Trap 3
 
-**The Neon connection string is not the one the dashboard gives you.** Neon hands out `postgresql://...?sslmode=require&channel_binding=require`. This app needs two edits: change the scheme to `postgresql+asyncpg://`, and remove the query parameters. `asyncpg` rejects `sslmode` and `channel_binding`; SSL is set in code instead — `app/core/database.py` adds `connect_args={"ssl": "require"}` when the URL starts with `postgresql`. The full walkthrough is in the README "Setting Up Neon" section.
+**The Neon connection string is not the one the dashboard gives you.** Neon hands out `postgresql://...?sslmode=require&channel_binding=require`. This app needs two edits: change the scheme to `postgresql+asyncpg://`, and remove the query parameters. `asyncpg` rejects `sslmode` and `channel_binding`; SSL is set in code instead. `app/core/database.py` adds `connect_args={"ssl": "require"}` when the URL starts with `postgresql`. The full walkthrough is in the README "Setting Up Neon" section.
 
 ### Trap 4
 
@@ -255,12 +288,12 @@ Every item here reflects real behaviour of this stack. Do not "fix" any of them 
 
 ### Trap 6
 
-**The `Dockerfile` does not run migrations, and that is deliberate.** The `CMD` is `uvicorn ...` alone. This looks like a missing step — it is not. Migrations run **once**, in the `Run database migrations` step of `deploy.yml`, before `gcloud run deploy`. Running them in the `CMD` means every Cloud Run instance runs them on boot and they race for the same locks, and a bad migration stops every instance from starting — a full outage instead of a failed deploy step. Do not add `alembic upgrade head &&` back to the `CMD`.
+**The `Dockerfile` does not run migrations, and that is deliberate.** The `CMD` is `uvicorn ...` alone. This looks like a missing step. It is not. Migrations run **once**, in the `Run database migrations` step of `deploy.yml`, before `gcloud run deploy`. Running them in the `CMD` means every Cloud Run instance runs them on boot and they race for the same locks, and a bad migration stops every instance from starting, a full outage instead of a failed deploy step. Do not add `alembic upgrade head &&` back to the `CMD`.
 
 Two consequences you own in exchange:
 
 - **Every migration must be backward compatible with the running revision.** The migration lands while the *old* revision is still serving. Add a column before code reads it; never drop a column the old revision still writes.
-- **Running the image locally no longer creates the schema.** Run `alembic upgrade head` yourself first — see [Verification protocol](#verification-protocol).
+- **Running the image locally no longer creates the schema.** Run `alembic upgrade head` yourself first: see [Verification protocol](#verification-protocol).
 
 ### Trap 7
 
@@ -289,7 +322,7 @@ full room again. Nothing errors; it just gets slower.
 **`router_loader` skips an app whose `router.py` fails to import, and says
 nothing.** It catches `ModuleNotFoundError` to skip a folder that has no
 `router.py`, and the same handler swallows a genuinely broken import *inside* a
-router — a typo in a module name takes the whole product off the API while the
+router. A typo in a module name takes the whole product off the API while the
 container still starts and `/health` still passes. If a route 404s that you
 believe you registered, check `GET /openapi.json` first: an absent path means
 the module did not import, not that the path is wrong.
@@ -300,7 +333,7 @@ the module did not import, not that the path is wrong.
 asks.** `enforce_sqlite_foreign_keys` sets `PRAGMA foreign_keys=ON` on every
 SQLite connection, and `tests/conftest.py` calls it on the test engine too.
 Without it a row written before the row it points at passes every local test and
-fails on the first real deploy — which is exactly what happened once. Do not
+fails on the first real deploy, which is exactly what happened once. Do not
 remove it to make a test pass; the test is telling the truth.
 
 ---
@@ -323,7 +356,7 @@ Violations here are defects, not style disagreements.
 | Log a token, a password, or a full connection string        | Use `app/core/logging.py`. Never log a secret.                                                                  |
 | Deploy application-local SQLite to Cloud Run                | The filesystem is ephemeral and unshared. Data is lost on the next instance. See [the multi-region decision](#the-multi-region-decision). |
 | Disable a CI check to make a PR green                       | Fix the code, or change the check deliberately and say why.                                                     |
-| Push, claim work is done, or open a PR without the gate green | Run `ruff check`, `ruff format --check`, and `pytest` locally first — including the format check. CI must never fail from your end. See [Verification protocol](#verification-protocol). |
+| Push, claim work is done, or open a PR without the gate green | Run `ruff check`, `ruff format --check`, and `pytest` locally first, including the format check. CI must never fail from your end. See [Verification protocol](#verification-protocol). |
 
 ---
 
@@ -343,32 +376,32 @@ Violations here are defects, not style disagreements.
 6. Add `tests/test_<name>.py`.
 7. Restart the server. The route is live. You did not touch `main.py`.
 
-### Add an environment variable — four places, one PR
+### Add an environment variable: four places, one PR
 
 Missing any step breaks somebody:
 
-1. `.env.example` — document the purpose, valid values, default, and whether production requires it.
-2. `app/core/config.py` — add the typed field to `Settings` and validate it.
-3. `.github/workflows/deploy.yml` — add a `--set-env-vars` line (or a Secret Manager reference for a secret).
-4. `cloud/environment-variables.md` — note it if an operator needs the context.
+1. `.env.example`, document the purpose, valid values, default, and whether production requires it.
+2. `app/core/config.py`, add the typed field to `Settings` and validate it.
+3. `.github/workflows/deploy.yml`, add a `--set-env-vars` line (or a Secret Manager reference for a secret).
+4. `cloud/environment-variables.md`, note it if an operator needs the context.
 
 ### Add a database table
 
 1. Define the model in the right `models.py` (shared → `app/models/`, product-specific → `app/apps/<name>/models.py`).
 2. Ensure `alembic/env.py` imports the module.
-3. `alembic revision --autogenerate -m "..."`, then **read the generated file** — autogenerate misses some changes (renames, server defaults).
+3. `alembic revision --autogenerate -m "..."`, then **read the generated file**, autogenerate misses some changes (renames, server defaults).
 4. `alembic upgrade head` locally. Add or update a test.
 
 ### Wire a real AI model into `ai_chat`
 
 1. Replace the echo line in `app/apps/ai_chat/service.py` with a real client call.
 2. Add the API key as a `Settings` field, in `.env.example`, and as a deploy secret (four places, above).
-3. Use the async client and a timeout. Handle the provider error path — never let a provider 500 become an unhandled 500.
+3. Use the async client and a timeout. Handle the provider error path, never let a provider 500 become an unhandled 500.
 
 ### Change the Dockerfile
 
 1. Read [`.github/instructions/deployment.md`](./.github/instructions/deployment.md) first.
-2. Keep: `$PORT` honoured, `--host 0.0.0.0`, and **no** migration in the `CMD` — it belongs to `deploy.yml` (see [Trap 6](#trap-6)).
+2. Keep: `$PORT` honoured, `--host 0.0.0.0`, and **no** migration in the `CMD`. It belongs to `deploy.yml` (see [Trap 6](#trap-6)).
 3. **Verify**: `docker build -t anuvia . && docker run --env-file .env.docker -p 8080:8080 anuvia`, then `curl localhost:8080/health`.
 
 ---
@@ -377,9 +410,9 @@ Missing any step breaks somebody:
 
 **Never describe unverified work as working.** If a check fails, report the failure with its output.
 
-**Run the full gate and get it green _before every push_ — never push work that will fail CI from your end.** These three commands are exactly what CI runs, so a green local run is a green CI run. A push that turns CI red on something you could have run locally (a formatting miss, a lint error, a failing test) wastes a CI round and a review cycle.
+**Run the full gate and get it green _before every push_, never push work that will fail CI from your end.** These three commands are exactly what CI runs, so a green local run is a green CI run. A push that turns CI red on something you could have run locally (a formatting miss, a lint error, a failing test) wastes a CI round and a review cycle.
 
-Minimum, always — before you push:
+Minimum, always, before you push:
 
 ```bash
 ruff check .
@@ -387,15 +420,15 @@ ruff format --check .
 pytest tests/ -v
 ```
 
-- **`ruff format --check .` is part of the gate, not optional.** The most common self-inflicted CI failure is a formatting-only miss — for example, editing a Markdown table re-widens its columns. CI fails it exactly like a broken test. Always run `ruff format .` (which writes the fix) and then `ruff format --check .` (which confirms it) before you push.
-- **If you cannot run the gate locally** (no virtualenv, missing dependencies), install them and run it. If you truly cannot, do not push silently — say so explicitly and treat the work as unverified.
+- **`ruff format --check .` is part of the gate, not optional.** The most common self-inflicted CI failure is a formatting-only miss, for example, editing a Markdown table re-widens its columns. CI fails it exactly like a broken test. Always run `ruff format .` (which writes the fix) and then `ruff format --check .` (which confirms it) before you push.
+- **If you cannot run the gate locally** (no virtualenv, missing dependencies), install them and run it. If you truly cannot, do not push silently, say so explicitly and treat the work as unverified.
 - **After you push, watch the checks.** If CI still fails, fix it and push again; work is not done until CI is green.
 
 If you touched the `Dockerfile`, `requirements.txt`, migrations, or the env model:
 
 ```bash
 docker build -t anuvia .
-# The CMD no longer migrates (Trap 6), so migrate first — the same two steps,
+# The CMD no longer migrates (Trap 6), so migrate first: the same two steps,
 # in the same order, that deploy.yml runs.
 docker run --rm --env-file .env.docker anuvia alembic upgrade head
 docker run --env-file .env.docker -p 8080:8080 anuvia
@@ -410,7 +443,7 @@ alembic downgrade -1
 alembic upgrade head
 ```
 
-If you touched a workflow: YAML that parses is not a workflow that runs. The gate is `ci.yml` (job `Lint & Test` plus `Docker image builds`) and `codeql.yml` (job `Analyze python`); `deploy.yml` only runs on `main`. All three gate checks must be green before a merge — see [`.github/instructions/github-workflows.md`](./.github/instructions/github-workflows.md).
+If you touched a workflow: YAML that parses is not a workflow that runs. The gate is `ci.yml` (job `Lint & Test` plus `Docker image builds`) and `codeql.yml` (job `Analyze python`); `deploy.yml` only runs on `main`. All three gate checks must be green before a merge: see [`.github/instructions/github-workflows.md`](./.github/instructions/github-workflows.md).
 
 `ci.yml` has a fourth job, `Migrations (Neon branch)`, which clones the production Neon branch and applies the pull request's migrations to it. It is **not** a required check: it skips itself on forks and where Neon is unconfigured, because it is the one job that needs a credential.
 
@@ -420,9 +453,9 @@ If you touched a workflow: YAML that parses is not a workflow that runs. The gat
 
 Before adding anything, answer: can the standard library do it? Can it be ~50 lines in `app/utils/`? Is it maintained? Does it fit the async model?
 
-**Prefer the platform:** `secrets` (tokens), `hashlib`/`hmac`, `datetime` with `UTC`, `uuid`, `functools.lru_cache`, `pathlib`. FastAPI already bundles Starlette and Pydantic — do not add a second validation or routing library.
+**Prefer the platform:** `secrets` (tokens), `hashlib`/`hmac`, `datetime` with `UTC`, `uuid`, `functools.lru_cache`, `pathlib`. FastAPI already bundles Starlette and Pydantic, do not add a second validation or routing library.
 
-**Never add:** a sync HTTP library (`requests`) — use the bundled `httpx.AsyncClient`; a second ORM or query builder; a settings library other than the `pydantic-settings` already in use; a background-task framework before there is a background task.
+**Never add:** a sync HTTP library (`requests`), use the bundled `httpx.AsyncClient`; a second ORM or query builder; a settings library other than the `pydantic-settings` already in use; a background-task framework before there is a background task.
 
 **Pin every version** in `requirements.txt`, exact (`==`), never a range. A range makes two machines build two different apps. When you add a package, pin it and commit the change with the reason in the PR.
 
@@ -436,8 +469,8 @@ Full model and the hardening checklist are in [`SECURITY.md`](./SECURITY.md).
 
 - **No secret lives in the repository.** `.env`, `.env.docker`, and `*.db` are git-ignored. Secrets reach the app only through the environment: `.env` locally, GitHub Secrets → Cloud Run in production.
 - **Configuration is validated once, centrally.** Only `app/core/config.py` reads the environment. A missing required secret fails at startup.
-- **Passwords are bcrypt-hashed. Tokens are short-lived JWTs.** No plaintext password is ever stored or logged. `hashed_password` never leaves the server — response schemas exclude it.
-- **The pipeline is keyless — Workload Identity Federation, no stored key.** Do not reintroduce a service account key. Secrets still pass as `--set-env-vars`, which is weaker than the target; the remaining hardening step is Secret Manager with `--set-secrets`. Both paths are in [`SECURITY.md`](./SECURITY.md) and [`cloud/github-actions.md`](./cloud/github-actions.md).
+- **Passwords are bcrypt-hashed. Tokens are short-lived JWTs.** No plaintext password is ever stored or logged. `hashed_password` never leaves the server: response schemas exclude it.
+- **The pipeline is keyless, Workload Identity Federation, no stored key.** Do not reintroduce a service account key. Secrets still pass as `--set-env-vars`, which is weaker than the target; the remaining hardening step is Secret Manager with `--set-secrets`. Both paths are in [`SECURITY.md`](./SECURITY.md) and [`cloud/github-actions.md`](./cloud/github-actions.md).
 - **CORS is open in the template and must be closed before production.** See [Trap 9](#trap-9).
 
 ---
@@ -448,11 +481,11 @@ Recorded in [`docs/adr/`](./docs/adr/). Read before proposing a change to any of
 
 | ADR                                                                   | Decision                                                        |
 | --------------------------------------------------------------------- | -------------------------------------------------------------- |
-| [0001](./docs/adr/0001-use-cloud-run-for-hosting.md)                  | Cloud Run for hosting — over a VM, GKE, or a PaaS               |
+| [0001](./docs/adr/0001-use-cloud-run-for-hosting.md)                  | Cloud Run for hosting, over a VM, GKE, or a PaaS               |
 | [0002](./docs/adr/0002-use-neon-postgres-for-persistence.md)          | Neon PostgreSQL for production; SQLite for local and tests     |
 | [0003](./docs/adr/0003-single-region-now-multi-region-later.md)       | Single region now; a defined path to multi-region when needed  |
 
-Add an ADR when a decision is expensive to reverse, affects how everyone works, or rejects an obvious alternative. Never edit an accepted ADR to change its decision — write a new one that supersedes it, and link both ways.
+Add an ADR when a decision is expensive to reverse, affects how everyone works, or rejects an obvious alternative. Never edit an accepted ADR to change its decision, write a new one that supersedes it, and link both ways.
 
 ---
 

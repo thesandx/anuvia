@@ -11,7 +11,7 @@ The layout is fixed. Every file has exactly one correct home.
 - **Do not invent new top-level folders.** No `src/`, no root `services/`, no second `helpers/` next to `app/utils/`.
 - A product lives in `app/apps/<name>/` and nowhere else. It has four files: `router.py`, `service.py`, `models.py`, `schemas.py`.
 - Shared code lives in `app/core/` (config, engine, security), `app/models/` (shared tables), `app/schemas/` (shared shapes), `app/repositories/` (queries for shared models), `app/utils/` (pure helpers).
-- If something does not fit, that is a signal to discuss the architecture — not to create a folder. Propose it, and update `project-structure.md` in the same pull request if it is accepted.
+- If something does not fit, that is a signal to discuss the architecture, not to create a folder. Propose it, and update `project-structure.md` in the same pull request if it is accepted.
 
 **Why:** the modular monolith works because the shape is predictable. When the layout drifts, the auto-loader assumptions and every assistant's assumptions break at once.
 
@@ -47,7 +47,7 @@ A layer imports downward only. A repository never imports a router. A model neve
 
 - Never call `os.environ` or `os.getenv` anywhere else.
 - Add every new variable as a typed field on `Settings`, with a default where a default is safe.
-- A required secret with no default (like `SECRET_KEY`) makes the app fail at startup if it is missing. That is correct — fail loud on boot, not silent at request time.
+- A required secret with no default (like `SECRET_KEY`) makes the app fail at startup if it is missing. That is correct, fail loud on boot, not silent at request time.
 
 **Why:** one validated, typed source of configuration. Scattered `os.getenv` calls are untyped, unvalidated, and impossible to audit.
 
@@ -60,7 +60,7 @@ A layer imports downward only. A repository never imports a router. A model neve
 - **Never call a blocking library inside a request.** No `requests`, no synchronous DB driver, no `time.sleep`, no blocking file or subprocess call. Any of them stalls the event loop for every concurrent user.
 - Use `httpx.AsyncClient` for outbound HTTP. Give every outbound call an explicit timeout.
 
-**Why:** one blocking call in an async server does not slow one request — it freezes the whole process until it returns.
+**Why:** one blocking call in an async server does not slow one request: it freezes the whole process until it returns.
 
 ---
 
@@ -70,7 +70,7 @@ Assume this code runs in production tonight, for real users.
 
 - Handle the error path. Raise `HTTPException` with the correct status at the boundary. Do not let a library exception become an unhandled 500.
 - No stub that returns fake data in a merged pull request. The one exception is the documented `ai_chat` echo, which is a marked placeholder for the model call.
-- No secret in source — not in a comment, not in a test fixture, not "temporarily".
+- No secret in source, not in a comment, not in a test fixture, not "temporarily".
 - Validate input at trust boundaries: request bodies, third-party responses, webhook payloads.
 
 ---
@@ -105,7 +105,7 @@ Before adding one, answer all of these:
 
 1. Can the standard library do it? (`secrets`, `hashlib`, `hmac`, `datetime`, `uuid`, `functools`, `pathlib`)
 2. Can it be done in under ~50 lines in `app/utils/`?
-3. Is it maintained — releases in the last 6 months, no critical advisories?
+3. Is it maintained, releases in the last 6 months, no critical advisories?
 4. Does it fit the async model? A sync-only library that blocks the event loop is not a fit.
 
 Adding one anyway? Pin it exactly in `requirements.txt` and say why in the pull request.
@@ -130,12 +130,12 @@ Same pull request. Not "later". This covers a change in **how something works**,
 
 ---
 
-## 11. Verify before you claim — and before you push
+## 11. Verify before you claim, and before you push
 
 - **Run the gate before every push, not only before you claim the work is done:** `ruff check .`, `ruff format --check .`, `pytest tests/ -v`. These three are exactly what CI runs, so a green local run is a green CI run. **CI must never fail on something you could have caught locally.**
-- **Run the formatter, not just the format check.** The most common self-inflicted CI failure is a formatting miss — for example, editing a Markdown table re-widens its columns. Run `ruff format .` to write the fix, then `ruff format --check .` to confirm, before you push.
+- **Run the formatter, not just the format check.** The most common self-inflicted CI failure is a formatting miss: for example, editing a Markdown table re-widens its columns. Run `ruff format .` to write the fix, then `ruff format --check .` to confirm, before you push.
 - If a check fails, report the failure with its output. Do not describe unverified work as working.
-- If you cannot run the gate locally, install the dependencies and run it. If you truly cannot, do not push silently — say so and treat the work as unverified.
+- If you cannot run the gate locally, install the dependencies and run it. If you truly cannot, do not push silently, say so and treat the work as unverified.
 - Changed the Dockerfile or dependencies? Build the image and run the container. `docker build -t anuvia .` then `docker run --env-file .env.docker -p 8080:8080 anuvia`, then `curl localhost:8080/health`.
 - Changed a migration? Confirm it applies and rolls back.
 
@@ -143,7 +143,7 @@ Same pull request. Not "later". This covers a change in **how something works**,
 
 ## 12. Write documentation in short, plain, present-tense English
 
-Every Markdown document in the repository follows the same style — `CLAUDE.md`, this folder, `docs/`, `cloud/`, the ADRs, and the README.
+Every Markdown document in the repository follows the same style, `CLAUDE.md`, this folder, `docs/`, `cloud/`, the ADRs, and the README.
 
 - **Keep sentences short.** At most 20 words for an instruction, 25 for a description. One idea per sentence.
 - **One instruction per sentence.** Split a compound step into separate sentences or list items.
@@ -153,7 +153,7 @@ Every Markdown document in the repository follows the same style — `CLAUDE.md`
 - **Write for a non-native reader.** Choose the plain word over the clever one. Avoid idiom and long noun clusters.
 - **Bring a document into compliance when you edit it.** Improve the file you touch, in the same pull request.
 
-**Why:** many readers — human and machine — parse these documents as instructions. Simple, unambiguous English lowers the chance a reader acts on a sentence in a way the author did not mean.
+**Why:** many readers: human and machine ,  parse these documents as instructions. Simple, unambiguous English lowers the chance a reader acts on a sentence in a way the author did not mean.
 
 ---
 

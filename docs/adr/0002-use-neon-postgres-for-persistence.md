@@ -17,31 +17,31 @@ A question keeps recurring: "should we use SQLite instead, maybe a distributed S
 
 ## Decision
 
-We will use **Neon** — serverless PostgreSQL over the `asyncpg` driver — for production. We will use **SQLite** over `aiosqlite` for local development and tests. The `DATABASE_URL` scheme selects the driver; no code branches beyond the SSL argument in `app/core/database.py`.
+We will use **Neon**, serverless PostgreSQL over the `asyncpg` driver, for production. We will use **SQLite** over `aiosqlite` for local development and tests. The `DATABASE_URL` scheme selects the driver; no code branches beyond the SSL argument in `app/core/database.py`.
 
 ## Alternatives considered
 
-### Option A — Neon PostgreSQL for production, SQLite for local (chosen)
+### Option A: Neon PostgreSQL for production, SQLite for local (chosen)
 
-Neon is serverless PostgreSQL: it scales compute to zero, has a free tier with no credit card, and speaks `asyncpg` natively. It pairs well with Cloud Run — both scale to zero, so an idle stack is nearly free. Local development keeps SQLite, so a new contributor needs no account and no network. The same SQLAlchemy models run on both because both go through the async engine.
+Neon is serverless PostgreSQL: it scales compute to zero, has a free tier with no credit card, and speaks `asyncpg` natively. It pairs well with Cloud Run, both scale to zero, so an idle stack is nearly free. Local development keeps SQLite, so a new contributor needs no account and no network. The same SQLAlchemy models run on both because both go through the async engine.
 
-### Option B — Application-local SQLite in production
+### Option B: Application-local SQLite in production
 
 Ship a SQLite file inside the container.
 
-Rejected because it cannot work on Cloud Run. The filesystem is ephemeral, so the file — and all its data — vanishes when the instance is recycled. Multiple instances each get their own file, so there is no single source of truth. SQLite as a server database also serialises writes to one writer. It is correct for local development and tests, and wrong for a multi-instance server.
+Rejected because it cannot work on Cloud Run. The filesystem is ephemeral, so the file, and all its data, vanishes when the instance is recycled. Multiple instances each get their own file, so there is no single source of truth. SQLite as a server database also serialises writes to one writer. It is correct for local development and tests, and wrong for a multi-instance server.
 
-### Option C — Turso / libSQL (distributed SQLite)
+### Option C: Turso / libSQL (distributed SQLite)
 
 Turso is SQLite at the edge, with replicas near users and a free tier. It is a genuinely attractive story for read-heavy, globally distributed apps, and it is the option people mean when they ask "why not SQLite?".
 
-Rejected for this codebase, today, for two concrete reasons. First, the SQLAlchemy dialect for libSQL is **sync-only**, and this app is async end to end (`create_async_engine`); adopting it means rewriting the data layer or running a blocking driver inside the event loop. Second, the benefit — edge-local reads — only pays off with a real, globally distributed, read-dominant user base, which a new solo project does not have. The migration cost is real and the payoff is deferred. It stays on the table for a future read-heavy, global workload — reconsider it in [ADR-0003](./0003-single-region-now-multi-region-later.md)'s revisit conditions.
+Rejected for this codebase, today, for two concrete reasons. First, the SQLAlchemy dialect for libSQL is **sync-only**, and this app is async end to end (`create_async_engine`); adopting it means rewriting the data layer or running a blocking driver inside the event loop. Second, the benefit, edge-local reads, only pays off with a real, globally distributed, read-dominant user base, which a new solo project does not have. The migration cost is real and the payoff is deferred. It stays on the table for a future read-heavy, global workload: reconsider it in [ADR-0003](./0003-single-region-now-multi-region-later.md)'s revisit conditions.
 
-### Option D — Cloud SQL (managed PostgreSQL on Google Cloud)
+### Option D: Cloud SQL (managed PostgreSQL on Google Cloud)
 
-Google's managed PostgreSQL, in the same project and the same region as Cloud Run — the tightest possible co-location, and no cross-cloud hop.
+Google's managed PostgreSQL, in the same project and the same region as Cloud Run, the tightest possible co-location, and no cross-cloud hop.
 
-Rejected as the default because it does not scale to zero. The smallest instance costs roughly $8–10/month whether or not anyone uses it. That is the wrong shape for a pre-revenue budget. It becomes the right answer when app-to-database latency must be minimal, because it can sit in the exact same region as the service. It is the recommended upgrade target in [ADR-0003](./0003-single-region-now-multi-region-later.md).
+Rejected as the default because it does not scale to zero. The smallest instance costs roughly $8-10/month whether or not anyone uses it. That is the wrong shape for a pre-revenue budget. It becomes the right answer when app-to-database latency must be minimal, because it can sit in the exact same region as the service. It is the recommended upgrade target in [ADR-0003](./0003-single-region-now-multi-region-later.md).
 
 ## Consequences
 

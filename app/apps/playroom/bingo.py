@@ -1,4 +1,4 @@
-"""Bingo rules — pure functions, no I/O, no randomness the caller cannot control.
+"""Bingo rules, pure functions, no I/O, no randomness the caller cannot control.
 
 This is a direct port of `lib/bingo.ts` in the Playroom frontend. That file is
 the reference implementation and it has tests behind it, so this module keeps
@@ -8,13 +8,13 @@ from prose.
 The board is a 5x5 grid holding the numbers 1 to 25, each exactly once,
 shuffled independently for every player. There is no free square.
 
-A player wins by completing FIVE lines — any mix of rows, columns and
+A player wins by completing FIVE lines, any mix of rows, columns and
 diagonals, out of the twelve that exist. One letter of B-I-N-G-O per completed
 line. Lines share cells, so a single number can complete two at once: count the
 lines, never assume one per pick.
 
 Cells are stored row-major, so index `i` sits at row `i // 5` and column
-`i % 5` — the same order the client's 5-column CSS grid renders them in.
+`i % 5`, the same order the client's 5-column CSS grid renders them in.
 """
 
 import secrets
@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 GRID_SIZE = 5
-#: Lines needed to win — one per letter of B-I-N-G-O.
+#: Lines needed to win, one per letter of B-I-N-G-O.
 LINES_TO_WIN = 5
 CARD_SIZE = GRID_SIZE * GRID_SIZE
 #: Numbers run 1..25, and every one of them appears on every board.
@@ -59,8 +59,8 @@ def _default_random(max_exclusive: int) -> int:
 def create_card(random: RandomInt = _default_random) -> list[int]:
     """Deal one board: the numbers 1..25 in a random order.
 
-    Fisher-Yates, so every arrangement is equally likely and — because the pool
-    is a permutation of 1..25 — every number appears exactly once by
+    Fisher-Yates, so every arrangement is equally likely and, because the pool
+    is a permutation of 1..25, every number appears exactly once by
     construction rather than by a uniqueness check afterwards.
     """
     cells = list(range(LOWEST_NUMBER, LOWEST_NUMBER + CARD_SIZE))

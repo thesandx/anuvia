@@ -8,7 +8,7 @@ How tests work in this repository, and how to add one.
 
 Tests run against an **in-memory SQLite** database, one per test, with no network and no `.env`. A test creates the schema, runs, and drops the schema. Nothing persists between tests.
 
-This is fast and isolated. It also means tests exercise the SQLite path, not PostgreSQL. A PostgreSQL-only issue (a server default, a specific type, a concurrency behaviour) does not appear in a unit test — catch it with the production-like Docker run instead. See [local-development.md](./local-development.md).
+This is fast and isolated. It also means tests exercise the SQLite path, not PostgreSQL. A PostgreSQL-only issue (a server default, a specific type, a concurrency behaviour) does not appear in a unit test, catch it with the production-like Docker run instead. See [local-development.md](./local-development.md).
 
 ---
 
@@ -20,7 +20,7 @@ pytest tests/test_auth.py -v        # one file
 pytest tests/test_auth.py::test_login -v   # one test
 ```
 
-`pyproject.toml` sets `asyncio_mode = "auto"`, so an `async def test_...` runs without an explicit decorator on newer setups. The existing tests still mark themselves with `@pytest.mark.asyncio`, which is fine and explicit — match the existing style.
+`pyproject.toml` sets `asyncio_mode = "auto"`, so an `async def test_...` runs without an explicit decorator on newer setups. The existing tests still mark themselves with `@pytest.mark.asyncio`, which is fine and explicit: match the existing style.
 
 ---
 
@@ -63,7 +63,7 @@ async def client():
 ```
 
 - `setup_db` is `autouse`, so every test starts with an empty schema.
-- `client` overrides `get_db` with the test session and drives the app in-process through `ASGITransport` — no real network, no running server.
+- `client` overrides `get_db` with the test session and drives the app in-process through `ASGITransport`: no real network, no running server.
 
 ---
 
@@ -114,7 +114,7 @@ You do not need to test framework behaviour (Pydantic already rejects a malforme
 
 ## What is hard to test here
 
-- **The `ai_chat` model call.** It is a stub today. When you wire a real provider, do not call the live API in a test — inject or patch the client and assert on the recorded messages, not on a real completion.
+- **The `ai_chat` model call.** It is a stub today. When you wire a real provider, do not call the live API in a test: inject or patch the client and assert on the recorded messages, not on a real completion.
 - **PostgreSQL-specific behaviour.** SQLite does not reproduce every PostgreSQL rule. Use the Docker-against-Neon run for those.
 
   One of those gaps is closed, and it is worth knowing why. **SQLite ignores
@@ -129,7 +129,7 @@ You do not need to test framework behaviour (Pydantic already rejects a malforme
   partial and functional unique indexes, `SELECT ... FOR UPDATE`, and how a
   `SAVEPOINT` rollback behaves under a real unique violation. To check those,
   point a copy of the suite at a PostgreSQL database. Build the engine **per
-  test** when you do — pytest-asyncio gives each test a fresh event loop, and a
+  test** when you do, pytest-asyncio gives each test a fresh event loop, and a
   pooled asyncpg connection belongs to the loop that opened it.
 - **Migrations.** Tests build the schema from the models, not from the migration history. Verify a migration separately: `alembic upgrade head` then `alembic downgrade -1`.
 
@@ -147,8 +147,8 @@ pytest tests/ -v
 
 CI adds two checks you cannot fully reproduce with one command, both on every pull request:
 
-- **`Docker image builds`** — builds the production image, migrates a throwaway SQLite database, starts the container, and smoke-tests `/health`. Reproduce it locally with `docker build -t anuvia . && docker run -e SECRET_KEY=x -p 8080:8080 anuvia`, then `curl localhost:8080/health`.
-- **`Migrations (Neon branch)`** — pull requests only, and not a required check. Clones the production Neon branch and runs `alembic upgrade head` against it, so a migration is tested on real PostgreSQL with the real schema. If the pull request adds migrations, it rolls them back and reapplies them too. Skipped on forks and where Neon is unconfigured.
-- **`Analyze python`** — CodeQL static security analysis (`codeql.yml`). It runs in GitHub, not locally; read its findings in the repository Security tab.
+- **`Docker image builds`**: builds the production image, migrates a throwaway SQLite database, starts the container, and smoke-tests `/health`. Reproduce it locally with `docker build -t anuvia . && docker run -e SECRET_KEY=x -p 8080:8080 anuvia`, then `curl localhost:8080/health`.
+- **`Migrations (Neon branch)`**: pull requests only, and not a required check. Clones the production Neon branch and runs `alembic upgrade head` against it, so a migration is tested on real PostgreSQL with the real schema. If the pull request adds migrations, it rolls them back and reapplies them too. Skipped on forks and where Neon is unconfigured.
+- **`Analyze python`**: CodeQL static security analysis (`codeql.yml`). It runs in GitHub, not locally; read its findings in the repository Security tab.
 
 Run all three before you call the work done. A green `pytest` with a failing `ruff` still fails CI.

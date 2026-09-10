@@ -6,7 +6,7 @@ Read this before you add a layer, a dependency, or a new app.
 
 ## The shape: a modular monolith
 
-Anuvia is one deployable process. Inside it, every product is a self-contained folder. This is deliberate — it ships as fast as a monolith and splits as cleanly as microservices, without the operational cost of many services.
+Anuvia is one deployable process. Inside it, every product is a self-contained folder. This is deliberate, it ships as fast as a monolith and splits as cleanly as microservices, without the operational cost of many services.
 
 - **One process, one image, one Cloud Run service.** Not many services, not a mesh.
 - **One product, one folder** in `app/apps/`. A product does not import another product. Shared needs move down into `app/core/`, `app/models/`, or `app/schemas/`.
@@ -28,7 +28,7 @@ Dependencies point inward and downward. A layer imports from layers below it, ne
 ├─────────────────────────────────────────────┤
 │ app/models/  +  app/apps/<name>/models.py      │  ORM tables
 ├─────────────────────────────────────────────┤
-│ app/core/  (config, database, security, deps)  │  Foundation — imports nothing above
+│ app/core/  (config, database, security, deps)  │  Foundation, imports nothing above
 └─────────────────────────────────────────────┘
 ```
 
@@ -59,9 +59,9 @@ Every step above the service is framework machinery. Your code lives in the serv
 
 At startup it scans `app/apps/*`. For each folder it imports `router.py` and reads three names:
 
-- `router` — the `APIRouter` (required; the folder is skipped with a warning if it is missing).
-- `PREFIX` — the URL prefix (optional; defaults to `/<folder-name>`).
-- `TAGS` — the Swagger group (optional; defaults to `[folder-name]`).
+- `router`. The `APIRouter` (required; the folder is skipped with a warning if it is missing).
+- `PREFIX`, the URL prefix (optional; defaults to `/<folder-name>`).
+- `TAGS`, the Swagger group (optional; defaults to `[folder-name]`).
 
 It then calls `app.include_router(router, prefix=PREFIX, tags=TAGS)`.
 
@@ -124,6 +124,6 @@ Adding a genuinely new layer (a caching tier, a message queue, a read-replica ro
 
 ## What this architecture is not
 
-- **Not microservices.** One image, one deploy. Splitting a product into its own service is a future option the folder boundary keeps cheap — not the current shape.
+- **Not microservices.** One image, one deploy. Splitting a product into its own service is a future option the folder boundary keeps cheap: not the current shape.
 - **Not hexagonal / clean architecture.** No ports-and-adapters ceremony. The layers here are the minimum that keeps logic testable, not a full dependency-inversion framework.
 - **Not multi-region today.** It is single-region by design, with a defined path to multi-region when a real user base needs it. See [ADR-0003](../../docs/adr/0003-single-region-now-multi-region-later.md).

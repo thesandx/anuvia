@@ -36,7 +36,7 @@ class SlidingWindowLimiter:
         self._hits: dict[str, deque[float]] = defaultdict(deque)
 
     #: Prune once the map grows past this. Every distinct address makes an
-    #: entry, and nothing else removes one until the sweeper runs — which is a
+    #: entry, and nothing else removes one until the sweeper runs, which is a
     #: scheduled job that may not be scheduled. A limiter must not be the thing
     #: that exhausts memory.
     MAX_BUCKETS = 20_000

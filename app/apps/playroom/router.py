@@ -123,7 +123,7 @@ async def get_room(
 
     # The read is what drives the turn clock. A player who has closed their tab
     # cannot time their own turn out, so it is settled by whoever else is
-    # looking — and everybody in the room reads this every two seconds.
+    # looking, and everybody in the room reads this every two seconds.
     #
     # Deliberately not enforced on the action route. A tap sent at nineteen
     # seconds that arrives at twenty-one is a player who did take their turn,
@@ -138,7 +138,7 @@ async def get_room(
     etag = _etag(room.version, viewer.id if viewer else None)
     headers = {
         "ETag": etag,
-        # `no-cache` — not `no-store`. The browser may keep this response, but
+        # `no-cache`, not `no-store`. The browser may keep this response, but
         # must revalidate before reusing it, which is exactly the poll's
         # semantics and lets the browser send `If-None-Match` on its own. With
         # `no-store` it may not keep anything, so it has nothing to revalidate
@@ -280,7 +280,7 @@ async def stream(key: str, authorization: Auth = None) -> StreamingResponse:
 
     One-way, so it needs no WebSocket infrastructure, survives proxies and
     reconnects on its own. The 2-second poll in the client stays as the
-    fallback — see `broker.py` for why that matters on more than one instance.
+    fallback, see `broker.py` for why that matters on more than one instance.
 
     The credential is a bearer header, not a query parameter. A token in a URL
     ends up in access logs and browser history, so the client reads this stream
@@ -297,7 +297,7 @@ async def stream(key: str, authorization: Auth = None) -> StreamingResponse:
         headers={
             "Cache-Control": "no-cache, no-transform",
             # Tells nginx-style proxies not to buffer, which would hold every
-            # frame until the response ended — that is, forever.
+            # frame until the response ended. That is, forever.
             "X-Accel-Buffering": "no",
             "Connection": "keep-alive",
         },

@@ -21,7 +21,7 @@ RoomPrivacy = Literal["Key only", "Locked after start"]
 RoomPhase = Literal["lobby", "playing", "round-results", "finished"]
 
 #: Trimmed, 1 to 16 characters. Whitespace-only input is rejected by the
-#: validator below, not by the length bound — "   " is four characters.
+#: validator below, not by the length bound, "   " is four characters.
 Nickname = Annotated[str, StringConstraints(min_length=1, max_length=64)]
 
 
@@ -69,7 +69,7 @@ class BingoState(CamelModel):
     turn_order: list[str]
     current_turn_index: int
     winner_id: str | None
-    #: Every line the winner held — five or more. Empty while play continues.
+    #: Every line the winner held, five or more. Empty while play continues.
     winning_lines: list[WinningLine]
     #: Seconds left for the player on turn, or null when nothing is on the
     #: clock. A duration, not a deadline, so a skewed device clock cannot

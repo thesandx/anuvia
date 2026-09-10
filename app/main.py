@@ -26,7 +26,7 @@ app = FastAPI(
 
 # Defaults to "*", which is right for local development and wrong for
 # production. Set CORS_ALLOW_ORIGINS to the real frontend origins before you
-# ship — see SECURITY.md. This is configuration, not a code change, so closing
+# ship: see SECURITY.md. This is configuration, not a code change, so closing
 # it does not need a deploy of new code.
 app.add_middleware(
     CORSMiddleware,

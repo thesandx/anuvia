@@ -3,7 +3,7 @@
 A turn that runs out is played automatically, so one player who closes their
 tab cannot hold up everybody else. The deadline lives on the round because that
 is what the turn belongs to, and because it has to survive the request that set
-it — the client cannot be trusted to time its own turn, and a client that has
+it. The client cannot be trusted to time its own turn, and a client that has
 gone is exactly the case this exists for.
 
 Nullable: rounds already in flight when this deploys have no deadline, and a

@@ -1,4 +1,4 @@
-"""Room sessions — everything that is true of a room whatever game it holds.
+"""Room sessions. Everything that is true of a room whatever game it holds.
 
 The layer split: this module owns the session (players, seats, phases, scores,
 expiry, the audit log and the transaction). `engines.py` owns one game's moves.
@@ -44,7 +44,7 @@ ROOM_TTL = timedelta(hours=settings.PLAYROOM_ROOM_TTL_HOURS)
 #:
 #: Twenty seconds is long enough to read a board of 25 numbers and short enough
 #: that a room does not stall on one person. It is a game-design number rather
-#: than an operational one, so it is a constant here instead of a setting — and
+#: than an operational one, so it is a constant here instead of a setting, and
 #: the client never hard-codes it, it renders the seconds the server reports.
 TURN_SECONDS = 20
 TURN_LIMIT = timedelta(seconds=TURN_SECONDS)
@@ -102,7 +102,7 @@ class PlayroomService:
 
         Expiry is applied lazily as well as by the sweeper. A room whose window
         has passed is flipped to `expired` here, which both hides it and frees
-        its key at the moment somebody asks — the sweeper is what bounds how
+        its key at the moment somebody asks. The sweeper is what bounds how
         long an untouched room lingers, not what makes the promise true.
         """
         if not is_valid_room_key(key):
@@ -131,7 +131,7 @@ class PlayroomService:
     async def resolve_player(self, room: models.Room, token: str | None) -> models.Player | None:
         """The player a bearer token names, if they are in this room.
 
-        Returns None for a caller with no token — a spectator. A token that
+        Returns None for a caller with no token: a spectator. A token that
         resolves to nobody in this room is an error, not a spectator: it is
         almost always a stale tab, and silently downgrading it would show that
         player a board-less room with no explanation.
@@ -200,13 +200,13 @@ class PlayroomService:
         """Replaces a host who has gone, so a room is never stranded.
 
         Only the host can start a round or advance past the results, and nothing
-        else promotes a replacement — a lobby whose host closed the tab would
+        else promotes a replacement. A lobby whose host closed the tab would
         never begin. The longest-present remaining player takes over, which is
         the lowest seat.
 
         Two triggers: the host is no longer an active player, or the host has
         not been seen for `HOST_IDLE` **while somebody else has**. The second
-        condition matters — without it a room where everybody stepped away would
+        condition matters, without it a room where everybody stepped away would
         churn its host on the first person to come back.
         """
         if not players:
@@ -318,7 +318,7 @@ class PlayroomService:
 
         The order is not negotiable: a listener woken before the commit would
         read the previous state and show it as the new one. The broker carries
-        only the version — each stream re-reads the room scoped to its own
+        only the version, each stream re-reads the room scoped to its own
         viewer, because two viewers must not receive the same boards.
         """
         await self.db.commit()
@@ -409,7 +409,7 @@ class PlayroomService:
 
         max_players = int(room.settings.get("maxPlayers", 8))
         if len(players) >= max_players:
-            raise RoomError("room-full", f"This room is full — it holds {max_players} players.")
+            raise RoomError("room-full", f"This room is full. It holds {max_players} players.")
 
         if (
             room.settings.get("privacy") == "Locked after start"
@@ -603,8 +603,8 @@ class PlayroomService:
         The unique constraints inside the engine are the backstop for when the
         turn check is ever wrong.
 
-        The whole move — the round lock, the idempotency lookup, the game's own
-        writes, the events, and the record of what this key produced — happens
+        The whole move, the round lock, the idempotency lookup, the game's own
+        writes, the events, and the record of what this key produced, happens
         against **one** load of the round and commits **once**. Both properties
         are load-bearing:
 
@@ -678,8 +678,8 @@ class PlayroomService:
     def _restart_turn_clock(self, game_round: models.Round) -> None:
         """Gives whoever is now on turn a full slice of time.
 
-        Called wherever the turn changes hands — a deal, a selection, a player
-        leaving — rather than only after a move, because a player who inherits
+        Called wherever the turn changes hands, a deal, a selection, a player
+        leaving, rather than only after a move, because a player who inherits
         the turn from somebody who left should not inherit their remaining two
         seconds either.
         """
@@ -724,7 +724,7 @@ class PlayroomService:
 
         At most one turn is settled per call. If a whole room walks away, the
         alternative is that the first person to come back watches the board
-        play itself out — bounded, but startling. One at a time means play
+        play itself out: bounded, but startling. One at a time means play
         resumes at the pace of people actually being there.
         """
         if room.phase != models.PHASE_PLAYING:
@@ -895,8 +895,8 @@ class PlayroomService:
         """The room a previous attempt with this key produced, if any.
 
         The stored key is scoped to the player, which does two things at once:
-        a snapshot can never be replayed to somebody else — so it cannot hand
-        one player another player's board — and two players who happen to send
+        a snapshot can never be replayed to somebody else, so it cannot hand
+        one player another player's board, and two players who happen to send
         the same key string in one round do not collide on the primary key.
 
         The snapshot is the state at the time of the original move; the client's

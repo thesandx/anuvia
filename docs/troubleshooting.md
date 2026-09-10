@@ -15,7 +15,7 @@ Symptom → cause → fix. Check here first when something fails.
 1. Change `postgresql://` to `postgresql+asyncpg://`.
 2. Remove `?sslmode=require` and any other query parameters.
 
-SSL is set in code — `app/core/database.py` adds `connect_args={"ssl": "require"}` for a `postgresql` URL. The correct form:
+SSL is set in code. `app/core/database.py` adds `connect_args={"ssl": "require"}` for a `postgresql` URL. The correct form:
 
 ```
 postgresql+asyncpg://user:password@ep-xxx.us-east-2.aws.neon.tech/neondb
@@ -63,7 +63,7 @@ Then run autogenerate again.
 
 ### A table is missing when running the Docker image locally
 
-**Cause:** the container `CMD` starts Uvicorn only — it does not migrate. That is deliberate (it is what stops Cloud Run instances racing on boot). A fresh database therefore has no schema, and any route that touches a table returns 500.
+**Cause:** the container `CMD` starts Uvicorn only: it does not migrate. That is deliberate (it is what stops Cloud Run instances racing on boot). A fresh database therefore has no schema, and any route that touches a table returns 500.
 
 **Fix:** migrate first, the same two steps the deploy runs:
 
@@ -92,7 +92,7 @@ docker run --env-file .env.docker -p 8080:8080 anuvia
 
 **Cause:** a blocking call inside an async test, or a mismatched loop scope.
 
-**Fix:** await every async call. `pyproject.toml` sets `asyncio_default_fixture_loop_scope = "function"` — keep it. Do not call a synchronous DB driver in a test.
+**Fix:** await every async call. `pyproject.toml` sets `asyncio_default_fixture_loop_scope = "function"`: keep it. Do not call a synchronous DB driver in a test.
 
 ---
 
@@ -114,11 +114,11 @@ docker run --env-file .env.docker -p 8080:8080 anuvia
 
 **Cause:** the route returned a raw ORM object, or a response schema included the column.
 
-**Fix:** set `response_model` to a schema that omits the field. `UserResponse` is the pattern — it has no `hashed_password`.
+**Fix:** set `response_model` to a schema that omits the field. `UserResponse` is the pattern: it has no `hashed_password`.
 
 ### A request stalls the whole server
 
-**Cause:** a blocking call inside a request — `requests`, a synchronous driver, `time.sleep`, a blocking file or subprocess call. It freezes the event loop for every concurrent user.
+**Cause:** a blocking call inside a request: `requests`, a synchronous driver, `time.sleep`, a blocking file or subprocess call. It freezes the event loop for every concurrent user.
 
 **Fix:** use an async client (`httpx.AsyncClient`) with a timeout, and `await` it.
 
@@ -132,7 +132,7 @@ docker run --env-file .env.docker -p 8080:8080 anuvia
 
 1. The server binds `localhost` instead of `0.0.0.0`. Keep `--host 0.0.0.0` in the `CMD`.
 2. The server ignores `$PORT`. Keep `--port ${PORT}`.
-3. The image fails to start for another reason — check the logs. Note the migration is **not** a possible cause here: it runs as its own `deploy.yml` step before the deploy, so a migration failure shows up as a failed deploy step, not a container that will not start. Reproduce with the Docker-against-Neon run.
+3. The image fails to start for another reason: check the logs. Note the migration is **not** a possible cause here: it runs as its own `deploy.yml` step before the deploy, so a migration failure shows up as a failed deploy step, not a container that will not start. Reproduce with the Docker-against-Neon run.
 
 ### A secret value is visible in `gcloud run services describe`
 
@@ -150,6 +150,6 @@ docker run --env-file .env.docker -p 8080:8080 anuvia
 
 ## When nothing here matches
 
-1. Reproduce with the production-like Docker run — it removes the SQLite-vs-PostgreSQL variable.
+1. Reproduce with the production-like Docker run: it removes the SQLite-vs-PostgreSQL variable.
 2. Read the actual error and the failing step, not the summary.
-3. Check whether a [trap in `CLAUDE.md`](../CLAUDE.md#traps--things-that-look-wrong-and-are-not) describes the behaviour — several failures are things that look wrong and are correct.
+3. Check whether a [trap in `CLAUDE.md`](../CLAUDE.md#traps--things-that-look-wrong-and-are-not) describes the behaviour, several failures are things that look wrong and are correct.

@@ -152,8 +152,8 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("round_id", "player_id"),
     )
 
-    # The composite primary key is not decoration. It is how the database — not
-    # application code — guarantees two players never take the same number.
+    # The composite primary key is not decoration. It is how the database, not
+    # application code, guarantees two players never take the same number.
     op.create_table(
         "playroom_bingo_selections",
         sa.Column("round_id", sa.Uuid(), nullable=False),

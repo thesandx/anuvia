@@ -117,7 +117,7 @@ Use SQLAlchemy expressions, never a hand-built SQL string.
 ```python
 from sqlalchemy import select
 
-# By primary key — the session get is enough
+# By primary key: the session get is enough
 thing = await db.get(Thing, thing_id)
 
 # By a column
@@ -157,7 +157,7 @@ class ThingResponse(BaseModel):
 Rules:
 
 - **A response schema that reads from an ORM object** sets `model_config = {"from_attributes": True}`.
-- **Never include a secret column** in a response schema. `UserResponse` has no `hashed_password` — that is the point.
+- **Never include a secret column** in a response schema. `UserResponse` has no `hashed_password`: that is the point.
 - **Use `EmailStr`** for email, so validation happens at the boundary.
 - **Keep request and response schemas separate.** They diverge as soon as one field is server-generated.
 
@@ -183,6 +183,6 @@ Rules:
 
 ## Errors
 
-- Raise `HTTPException(status_code=..., detail="...")` at the boundary. The `detail` reaches the client — keep it accurate and free of internal detail.
+- Raise `HTTPException(status_code=... detail="...")` at the boundary. The `detail` reaches the client, keep it accurate and free of internal detail.
 - Do not catch an exception only to re-raise it unchanged. Let it propagate, or handle it meaningfully.
 - An outbound call (a model provider, Stripe) gets a timeout and a failure branch. A provider error becomes a clear `HTTPException`, never an unhandled 500.

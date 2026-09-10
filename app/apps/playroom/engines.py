@@ -1,4 +1,4 @@
-"""Game engines — the per-game half of a round.
+"""Game engines: the per-game half of a round.
 
 The core tables carry no Bingo concepts. A new game adds tables and a strategy
 class here. It changes no route, because every move travels in one action
@@ -175,7 +175,7 @@ class BingoEngine:
 
         The number is drawn from the ones still free. "From their own board" and
         "still free" are the same set here, because every board holds all 25
-        numbers — a player can always take any number nobody else has.
+        numbers. A player can always take any number nobody else has.
 
         It is a real move: the same insert, the same turn advance, the same
         end-of-round check. The only difference is who chose, and the event
@@ -295,7 +295,7 @@ class BingoEngine:
             # one: a rejection at four lines is not the same mistake as at one.
             raise RejectedClaim(
                 f"You need {LINES_TO_WIN} complete lines to call bingo. "
-                f"You have {len(lines)} — {short} to go.",
+                f"You have {len(lines)}, so {short} to go.",
                 lines_held=len(lines),
             )
 
@@ -338,7 +338,7 @@ class BingoEngine:
         Reaching five lines takes roughly 19 numbers, and a full room of eight
         gets about three turns each, so this is the case a busy room is most
         likely to reach. Nothing forces a player to claim, and once every number
-        is gone no further selection is possible — the round would otherwise sit
+        is gone no further selection is possible. The round would otherwise sit
         there until the host ended the session.
 
         **Why the closer wins.** With all 25 numbers taken, every board holds
@@ -348,7 +348,7 @@ class BingoEngine:
         gives the results screen a winner to show.
 
         Line points are not awarded here. They exist to reward a near miss, and
-        at exhaustion every board is complete — paying 10 a line would hand each
+        at exhaustion every board is complete, paying 10 a line would hand each
         non-winner 120 points against the winner's 100.
         """
         game_round.winner_player_id = closer.id
