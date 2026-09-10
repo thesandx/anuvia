@@ -3,15 +3,30 @@ from logging.config import fileConfig
 
 from sqlalchemy.ext.asyncio import create_async_engine
 
-import app.apps.ai_chat.models  # noqa: F401
-import app.apps.payments.models  # noqa: F401
-import app.apps.playroom.models  # noqa: F401
-
-# Import all models so Alembic can detect them
-import app.models.user  # noqa: F401
+import app.apps.ai_chat.models
+import app.apps.payments.models
+import app.apps.playroom.models
+import app.models.user
 from alembic import context
 from app.core.config import settings
 from app.core.database import Base
+
+# Alembic can only autogenerate against models that are imported by the time
+# `target_metadata` is read. The imports above exist for that side effect and
+# nothing else, which is why a new app with tables has to add a line here or
+# `--autogenerate` produces an empty migration. See CLAUDE.md, trap 2.
+#
+# Naming them here is not decoration. An import whose only purpose is a side
+# effect looks unused to every static analyser — ruff wanted a `# noqa: F401`
+# and CodeQL raised `py/unused-import` — and silencing that on each line
+# teaches the next reader that the line is disposable. It is the opposite:
+# deleting one loses a table.
+REGISTERED_MODELS = (
+    app.models.user,
+    app.apps.ai_chat.models,
+    app.apps.payments.models,
+    app.apps.playroom.models,
+)
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
