@@ -24,12 +24,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Defaults to "*", which is right for local development and wrong for
+# production. Set CORS_ALLOW_ORIGINS to the real frontend origins before you
+# ship — see SECURITY.md. This is configuration, not a code change, so closing
+# it does not need a deploy of new code.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # The rooms API returns a validator the browser must be allowed to read,
+    # or every poll re-downloads a room that did not change.
+    expose_headers=["ETag"],
 )
 
 auto_register_routers(app)

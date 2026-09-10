@@ -116,6 +116,21 @@ You do not need to test framework behaviour (Pydantic already rejects a malforme
 
 - **The `ai_chat` model call.** It is a stub today. When you wire a real provider, do not call the live API in a test — inject or patch the client and assert on the recorded messages, not on a real completion.
 - **PostgreSQL-specific behaviour.** SQLite does not reproduce every PostgreSQL rule. Use the Docker-against-Neon run for those.
+
+  One of those gaps is closed, and it is worth knowing why. **SQLite ignores
+  foreign keys unless each connection asks for them**, so a row written before
+  the row it points at used to pass every local test and fail on the first real
+  deploy. `app/core/database.py` exports `enforce_sqlite_foreign_keys`, the
+  application engine calls it, and `tests/conftest.py` calls it on the test
+  engine. If a test starts failing on a foreign key, the test is right: fix the
+  write order, do not remove the pragma.
+
+  What SQLite still cannot show you: native `uuid` and `jsonb` behaviour,
+  partial and functional unique indexes, `SELECT ... FOR UPDATE`, and how a
+  `SAVEPOINT` rollback behaves under a real unique violation. To check those,
+  point a copy of the suite at a PostgreSQL database. Build the engine **per
+  test** when you do — pytest-asyncio gives each test a fresh event loop, and a
+  pooled asyncpg connection belongs to the loop that opened it.
 - **Migrations.** Tests build the schema from the models, not from the migration history. Verify a migration separately: `alembic upgrade head` then `alembic downgrade -1`.
 
 ---

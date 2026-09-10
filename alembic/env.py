@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 import app.apps.ai_chat.models  # noqa: F401
 import app.apps.payments.models  # noqa: F401
+import app.apps.playroom.models  # noqa: F401
 
 # Import all models so Alembic can detect them
 import app.models.user  # noqa: F401

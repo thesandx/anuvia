@@ -10,6 +10,9 @@ on:
 #   CLOUD_RUN_SERVICE    — e.g. anuvia
 #   APP_NAME             — e.g. anuvia
 #   ARTIFACT_REPOSITORY  — Artifact Registry repo name, e.g. containers
+#   CORS_ALLOW_ORIGINS   — browser origins allowed to call the API, comma-
+#                          separated. Defaults to "*". Set it to the real
+#                          frontend origins before you ship.
 #
 # GitHub Secrets (Settings → Secrets and variables → Secrets):
 #   WIF_PROVIDER         — Workload Identity provider resource name
@@ -17,6 +20,14 @@ on:
 #   WIF_SERVICE_ACCOUNT  — deployer SA email (github-deployer@PROJECT.iam.gserviceaccount.com)
 #   SECRET_KEY           — JWT signing secret (min 32 chars)
 #   DATABASE_URL         — postgresql+asyncpg://user:password@ep-xxx.neon.tech/neondb
+#                          Use Neon's POOLED endpoint (hostname contains -pooler)
+#                          for the application: it is a connection-per-request
+#                          workload and PgBouncer is what keeps it inside Neon's
+#                          connection limit.
+#   DATABASE_URL_UNPOOLED — the same database on Neon's DIRECT endpoint (no
+#                          -pooler). Used only by the migration step below.
+#                          Optional: it falls back to DATABASE_URL.
+#   PLAYROOM_MAINTENANCE_TOKEN — bearer token the rooms retention sweeper needs
 #   STRIPE_SECRET_KEY    — (optional)
 #   STRIPE_WEBHOOK_SECRET — (optional)
 #
@@ -74,6 +85,11 @@ jobs:
       # revision. -e VAR (no value) forwards the variable from the step env
       # rather than putting the secret on the command line.
       #
+      # It runs on Neon's DIRECT endpoint, not the pooled one. The pooled
+      # endpoint is PgBouncer in transaction mode, which does not keep session
+      # state; a migration over it fails in ways that never name pooling. The
+      # application keeps using the pooled endpoint, which is what it wants.
+      #
       # This runs BEFORE the new revision exists, so the OLD revision serves
       # traffic against the NEW schema for the length of the rollout. Every
       # migration must therefore be backward compatible with the running
@@ -81,7 +97,7 @@ jobs:
       # the old revision still writes. See cloud/deployment.md.
       - name: Run database migrations
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL_UNPOOLED || secrets.DATABASE_URL }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
         run: |
           docker run --rm -e DATABASE_URL -e SECRET_KEY \
@@ -107,7 +123,9 @@ jobs:
             --set-env-vars "SECRET_KEY=${{ secrets.SECRET_KEY }}" \
             --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" \
             --set-env-vars "STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}" \
-            --set-env-vars "STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}"
+            --set-env-vars "STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
+            --set-env-vars "PLAYROOM_MAINTENANCE_TOKEN=${{ secrets.PLAYROOM_MAINTENANCE_TOKEN }}" \
+            --set-env-vars "CORS_ALLOW_ORIGINS=${{ vars.CORS_ALLOW_ORIGINS || '*' }}"
 
       - name: Show deployed URL
         run: |

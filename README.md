@@ -98,8 +98,11 @@ anuvia/
 │   └── apps/                # ← One folder per product
 │       ├── auth/            # POST /auth/register, /login  GET /auth/me
 │       ├── payments/        # GET /payments/subscription
-│       └── ai_chat/         # POST /ai-chat/chat
-│           (each has router.py, service.py, models.py, schemas.py)
+│       ├── ai_chat/         # POST /ai-chat/chat
+│       └── playroom/        # /games/v1/... — the Playroom rooms API
+│           (each has router.py, service.py, models.py, schemas.py;
+│            playroom adds bingo.py, engines.py, serializers.py and more,
+│            because a game is more than four files. See its docstrings.)
 │
 ├── alembic/                 # Database migrations
 │   ├── env.py               # Async-aware migration runner
@@ -107,7 +110,8 @@ anuvia/
 │
 ├── tests/
 │   ├── conftest.py          # In-memory SQLite fixture + async test client
-│   └── test_auth.py         # Auth flow tests
+│   ├── test_auth.py         # Auth flow tests
+│   └── test_playroom.py     # Rooms API: turns, board visibility, win rules
 │
 ├── .env.example             # Safe template — copy to .env, fill in real values
 ├── .gitignore               # .env, *.db, .venv, caches all excluded
