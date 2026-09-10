@@ -16,6 +16,7 @@ from app.apps.playroom import models, ratelimit
 from app.apps.playroom.bingo import CARD_SIZE, find_winning_lines
 from app.apps.playroom.catalogue import CATALOGUE
 from app.apps.playroom.keys import ROOM_KEY_ALPHABET, ROOM_KEY_LENGTH
+from app.apps.playroom.service import TURN_SECONDS
 
 BASE = "/games/v1"
 
@@ -394,6 +395,121 @@ async def test_two_players_may_send_the_same_idempotency_key(client):
     assert second.json()["bingo"]["selected"] == [4, 9]
     # The guest got their own board back, not a replay of the host's response.
     assert set(second.json()["bingo"]["cards"]) == {joined["playerId"]}
+
+
+# --- the turn clock --------------------------------------------------------
+
+
+async def expire_the_turn(db_session, key: str) -> None:
+    """Ages the current turn past its deadline, without waiting 20 seconds."""
+    async with db_session() as db:
+        room = (await db.execute(sa_select(models.Room).where(models.Room.key == key))).scalar_one()
+        game_round = (
+            (
+                await db.execute(
+                    sa_select(models.Round)
+                    .where(models.Round.room_id == room.id)
+                    .order_by(models.Round.round_number.desc())
+                    .limit(1)
+                )
+            )
+            .scalars()
+            .first()
+        )
+        game_round.turn_expires_at = datetime.now(UTC) - timedelta(seconds=1)
+        await db.commit()
+
+
+async def test_a_turn_carries_a_countdown(client):
+    created = await create_room(client)
+    key, token = created["room"]["key"], created["playerToken"]
+
+    lobby = (await client.get(f"{BASE}/rooms/{key}", headers=auth(token))).json()
+    assert lobby["bingo"] is None
+
+    started = (await client.post(f"{BASE}/rooms/{key}/rounds", headers=auth(token))).json()
+    remaining = started["bingo"]["turnSecondsRemaining"]
+    assert remaining is not None
+    assert 0 < remaining <= TURN_SECONDS
+
+
+async def test_a_turn_that_runs_out_is_played_and_passed_on(client, db_session):
+    """The whole point: this has to work when the player is not there.
+
+    Their own client cannot time their turn out, because it is gone. Another
+    player's read is what settles it.
+    """
+    created = await create_room(client)
+    key, host_token = created["room"]["key"], created["playerToken"]
+    joined = await join_room(client, key, "Dev")
+    await client.post(f"{BASE}/rooms/{key}/rounds", headers=auth(host_token))
+
+    # The host is on turn and walks away.
+    assert await whose_turn(client, key, host_token) == created["playerId"]
+    await expire_the_turn(db_session, key)
+
+    # The guest reads the room, and that read is what plays the turn out.
+    room = (await client.get(f"{BASE}/rooms/{key}", headers=auth(joined["playerToken"]))).json()
+    assert len(room["bingo"]["selected"]) == 1
+    assert room["bingo"]["turnOrder"][room["bingo"]["currentTurnIndex"]] == joined["playerId"]
+    # The number came from the numbers still free, so it is a real move.
+    assert 1 <= room["bingo"]["selected"][0] <= CARD_SIZE
+    # And the player who inherits the turn gets a full slice of time.
+    assert room["bingo"]["turnSecondsRemaining"] > 0
+
+
+async def test_a_timed_out_turn_is_recorded_as_one(client, db_session):
+    """A turn nobody took must not read like a turn somebody took."""
+    created = await create_room(client)
+    key, token = created["room"]["key"], created["playerToken"]
+    await client.post(f"{BASE}/rooms/{key}/rounds", headers=auth(token))
+    await expire_the_turn(db_session, key)
+    await client.get(f"{BASE}/rooms/{key}", headers=auth(token))
+
+    async with db_session() as db:
+        rows = (await db.execute(sa_select(models.Event).order_by(models.Event.id))).scalars().all()
+        kinds = [row.type for row in rows]
+        assert "turn_timed_out" in kinds
+        auto = next(row for row in rows if row.type == "number_selected")
+        assert auto.payload.get("auto") is True
+
+
+async def test_only_one_turn_is_played_per_read(client, db_session):
+    """A room everybody left must not play itself out to whoever comes back."""
+    created = await create_room(client)
+    key, token = created["room"]["key"], created["playerToken"]
+    joined = await join_room(client, key, "Dev")
+    await client.post(f"{BASE}/rooms/{key}/rounds", headers=auth(token))
+
+    await expire_the_turn(db_session, key)
+    first = (await client.get(f"{BASE}/rooms/{key}", headers=auth(token))).json()
+    assert len(first["bingo"]["selected"]) == 1
+
+    # The next turn is freshly clocked, so reading again changes nothing.
+    second = (await client.get(f"{BASE}/rooms/{key}", headers=auth(token))).json()
+    assert len(second["bingo"]["selected"]) == 1
+    assert joined["playerId"] in second["bingo"]["turnOrder"]
+
+
+async def test_a_turn_still_running_is_left_alone(client, db_session):
+    created = await create_room(client)
+    key, token = created["room"]["key"], created["playerToken"]
+    await client.post(f"{BASE}/rooms/{key}/rounds", headers=auth(token))
+
+    room = (await client.get(f"{BASE}/rooms/{key}", headers=auth(token))).json()
+    assert room["bingo"]["selected"] == []
+
+
+async def test_a_finished_round_stops_the_clock(client):
+    created = await create_room(client)
+    key, token = created["room"]["key"], created["playerToken"]
+    await client.post(f"{BASE}/rooms/{key}/rounds", headers=auth(token))
+    for value in range(1, CARD_SIZE + 1):
+        await select(client, key, token, value)
+
+    room = (await client.get(f"{BASE}/rooms/{key}", headers=auth(token))).json()
+    assert room["phase"] == "round-results"
+    assert room["bingo"]["turnSecondsRemaining"] is None
 
 
 # --- claiming --------------------------------------------------------------

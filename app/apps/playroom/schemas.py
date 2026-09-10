@@ -71,6 +71,10 @@ class BingoState(CamelModel):
     winner_id: str | None
     #: Every line the winner held — five or more. Empty while play continues.
     winning_lines: list[WinningLine]
+    #: Seconds left for the player on turn, or null when nothing is on the
+    #: clock. A duration, not a deadline, so a skewed device clock cannot
+    #: mis-time a twenty-second turn.
+    turn_seconds_remaining: int | None = None
 
 
 class RoundResultRow(CamelModel):
