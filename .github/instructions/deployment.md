@@ -30,7 +30,7 @@ ENV PORT=8080
 CMD exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT}
 ```
 
-**Load-bearing lines — keep them:**
+**Load-bearing lines: keep them:**
 
 - **`--host 0.0.0.0`.** A container that binds `localhost` is unreachable. This produces Cloud Run's least helpful error: "The user-provided container failed to start and listen on the port defined by the PORT environment variable."
 - **`--port ${PORT}`.** Cloud Run injects `PORT` and overrides the default. Never hardcode a port.
@@ -39,7 +39,7 @@ CMD exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT}
 
 - **`exec`.** It replaces the shell, so Uvicorn runs as PID 1 and receives Cloud Run's `SIGTERM` directly. Without it the shell holds PID 1, swallows the signal, and the instance is killed instead of shutting down gracefully.
 
-**There is deliberately no migration in the `CMD`.** Do not add one back — see the next section.
+**There is deliberately no migration in the `CMD`.** Do not add one back: see the next section.
 
 ---
 
@@ -58,7 +58,7 @@ Migrations run **once**, in the `Run database migrations` step of `deploy.yml`, 
       alembic upgrade head
 ```
 
-Why it is not in the container `CMD` — the two reasons, both of which bite before you add instances or regions:
+Why it is not in the container `CMD`, the two reasons, both of which bite before you add instances or regions:
 
 1. **Concurrency.** When Cloud Run runs several instances, each would run the migration on boot. They race for the same locks. One wins; the others may error or start against a half-migrated schema.
 2. **Coupling.** A failed migration would keep every instance from starting, so a bad migration becomes a full outage instead of a failed deploy step.
@@ -104,7 +104,7 @@ docker run --env-file .env.docker -p 8080:8080 anuvia
 
 ## Authentication to Google Cloud
 
-`deploy.yml` authenticates with **Workload Identity Federation** — no key:
+`deploy.yml` authenticates with **Workload Identity Federation**. No key:
 
 ```yaml
 permissions:
@@ -115,7 +115,7 @@ permissions:
     service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 ```
 
-GitHub presents a short-lived OIDC token bound to this repository, Google exchanges it for temporary credentials, and no key exists anywhere. The `id-token: write` permission is on the deploy job only. Do not reintroduce a service account key — the setup is documented in [`cloud/github-actions.md`](../../cloud/github-actions.md).
+GitHub presents a short-lived OIDC token bound to this repository, Google exchanges it for temporary credentials, and no key exists anywhere. The `id-token: write` permission is on the deploy job only. Do not reintroduce a service account key. The setup is documented in [`cloud/github-actions.md`](../../cloud/github-actions.md).
 
 ---
 
@@ -138,6 +138,6 @@ This runs the migration and starts the server exactly as Cloud Run does. If it f
 
 - **`--allow-unauthenticated`.** The API is public. Authentication happens in the app (JWT), not at the Cloud Run edge. Correct for a public API.
 - **`--port 8080`.** Matches the container's default and `HOSTNAME`.
-- **Min instances.** Default is 0 (scale to zero, no idle cost, but cold starts). Set `--min-instances=1` (~$10–15/month) only if cold starts hurt.
+- **Min instances.** Default is 0 (scale to zero, no idle cost, but cold starts). Set `--min-instances=1` (~$10-15/month) only if cold starts hurt.
 - **Concurrency.** Cloud Run sends many requests to one instance. This is safe because the app is stateless and each request gets its own session. Do not add process-global mutable state.
 - **Region.** Deploy to the region closest to your users **and** your database. See [`cloud/multi-region.md`](../../cloud/multi-region.md).

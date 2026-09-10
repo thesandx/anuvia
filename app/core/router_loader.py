@@ -25,12 +25,12 @@ def auto_register_routers(app: FastAPI) -> None:
         try:
             module = importlib.import_module(module_path)
         except ModuleNotFoundError:
-            logger.debug("No router.py in apps/%s — skipping", pkg.name)
+            logger.debug("No router.py in apps/%s. Skipping", pkg.name)
             continue
 
         router = getattr(module, "router", None)
         if router is None:
-            logger.warning("apps/%s/router.py has no `router` object — skipping", pkg.name)
+            logger.warning("apps/%s/router.py has no `router` object, skipping", pkg.name)
             continue
 
         prefix = getattr(module, "PREFIX", f"/{pkg.name}")

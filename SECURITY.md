@@ -45,15 +45,15 @@ app.add_middleware(
 )
 ```
 
-### 2. The deploy uses a service account key — resolved
+### 2. The deploy uses a service account key: resolved
 
-**Done.** `deploy.yml` now authenticates with Workload Identity Federation — a short-lived OIDC token bound to this repository, no stored key. Kept here for the record: do not reintroduce a service account key. See [`cloud/github-actions.md`](./cloud/github-actions.md).
+**Done.** `deploy.yml` now authenticates with Workload Identity Federation: a short-lived OIDC token bound to this repository, no stored key. Kept here for the record: do not reintroduce a service account key. See [`cloud/github-actions.md`](./cloud/github-actions.md).
 
 ### 3. Secrets are passed as environment variables at deploy
 
 `--set-env-vars` stores the value in the Cloud Run revision, readable by anyone with `roles/run.viewer`. **Fix:** move secrets to Secret Manager and reference them with `--set-secrets`. See [`cloud/environment-variables.md`](./cloud/environment-variables.md).
 
-### 4. Migrations run in the container start command — resolved
+### 4. Migrations run in the container start command: resolved
 
 **Done.** `deploy.yml` runs `alembic upgrade head` once, before `gcloud run deploy`; the container `CMD` starts Uvicorn only, so concurrent instances cannot race on boot. Kept here for the record: do not move the migration back into the `CMD`. See [`cloud/deployment.md`](./cloud/deployment.md).
 
@@ -61,7 +61,7 @@ app.add_middleware(
 
 ## Pre-production hardening checklist
 
-- [ ] `APP_ENV=production` in the deployed service — `/docs` and `/redoc` are disabled.
+- [ ] `APP_ENV=production` in the deployed service. `/docs` and `/redoc` are disabled.
 - [ ] `SECRET_KEY` is at least 32 random characters, unique to production.
 - [ ] `DATABASE_URL` points to Neon (or Cloud SQL), never local SQLite.
 - [ ] CORS `allow_origins` is restricted to your real frontend (gap 1).
@@ -77,4 +77,4 @@ app.add_middleware(
 
 ## Reporting a vulnerability
 
-This is a personal / small-team project. Report a suspected vulnerability privately to the maintainer — do not open a public issue with exploit detail. Include the affected endpoint, a reproduction, and the impact.
+This is a personal / small-team project. Report a suspected vulnerability privately to the maintainer, do not open a public issue with exploit detail. Include the affected endpoint, a reproduction, and the impact.

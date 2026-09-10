@@ -5,7 +5,7 @@ describe a game.** Adding a game adds tables. It does not change the core, and
 it does not change a route.
 
 Three deliberate departures from the SQL in the handover document, all for the
-same reason — this repository runs SQLite locally, in tests, and in the CI
+same reason. This repository runs SQLite locally, in tests, and in the CI
 container smoke test, and PostgreSQL (Neon) in production. One model has to
 serve both:
 
@@ -20,8 +20,8 @@ serve both:
    want. The handover's own guidance for a new game is to prefix its tables.
 
 What does NOT change is the constraint that makes the game safe:
-`PRIMARY KEY (round_id, number)` on selections. It is how the database — not
-application code — guarantees two players never take the same number.
+`PRIMARY KEY (round_id, number)` on selections. It is how the database, not
+application code, guarantees two players never take the same number.
 """
 
 from datetime import datetime
@@ -57,7 +57,7 @@ JsonColumn = JSON().with_variant(JSONB, "postgresql")
 #: in, so the event log would fail on its first insert.
 AutoBigInt = BigInteger().with_variant(Integer, "sqlite")
 
-# Room lifecycle. Text rather than a native enum — see the module docstring.
+# Room lifecycle. Text rather than a native enum: see the module docstring.
 ROOM_STATUS_ACTIVE = "active"
 ROOM_STATUS_EXPIRED = "expired"
 
@@ -104,7 +104,7 @@ class Room(Base):
     host_player_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True)
     phase: Mapped[str] = mapped_column(String(16), nullable=False, default=PHASE_LOBBY)
     round_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    #: { rounds, privacy, maxPlayers } — stored per room so a later game can
+    #: { rounds, privacy, maxPlayers }, stored per room so a later game can
     #: vary them without reshaping the table.
     settings: Mapped[dict] = mapped_column(JsonColumn, nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default=ROOM_STATUS_ACTIVE)
@@ -227,7 +227,7 @@ class BingoBoard(Base):
 
     Every board is stored; not every board is sent. The server has to validate
     any player's claim against their own board. Visibility is a serialisation
-    concern applied on the way out of the handler — see `serializers.py`.
+    concern applied on the way out of the handler: see `serializers.py`.
     """
 
     __tablename__ = "playroom_bingo_boards"
@@ -272,7 +272,7 @@ class BingoSelection(Base):
 class Event(Base):
     """The audit log. Written in the same transaction as every state change.
 
-    Never in a background task — an event that can be lost is not an audit log.
+    Never in a background task. An event that can be lost is not an audit log.
     It carries no name and no address, so it survives retention untouched.
     """
 

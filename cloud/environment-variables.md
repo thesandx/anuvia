@@ -23,7 +23,7 @@ No secret is ever in the repository. `.env`, `.env.docker`, and `*.db` are git-i
 
 | Variable                    | Required | Default                          | Purpose                                   |
 | --------------------------- | -------- | -------------------------------- | ----------------------------------------- |
-| `SECRET_KEY`                | **Yes**  | — (fails at startup if missing)  | JWT signing key. Min 32 random chars.     |
+| `SECRET_KEY`                | **Yes**  |, (fails at startup if missing)  | JWT signing key. Min 32 random chars.     |
 | `DATABASE_URL`              | No       | `sqlite+aiosqlite:///./local.db` | SQLAlchemy async connection string.       |
 | `APP_NAME`                  | No       | `anuvia`                         | Shown in the API docs.                    |
 | `APP_ENV`                   | No       | `development`                    | `production` disables `/docs` and `/redoc`. |
@@ -35,17 +35,17 @@ No secret is ever in the repository. `.env`, `.env.docker`, and `*.db` are git-i
 | `DEPLOYED_AT`               | No       | `""`                             | UTC deploy time (ISO-8601), set by the workflow. `/health` renders it in IST. |
 | `CORS_ALLOW_ORIGINS`        | No       | `*`                              | Browser origins allowed to call the API. Comma-separated. `*` is for local development only. |
 | `PLAYROOM_MAINTENANCE_TOKEN` | No      | `""`                             | Bearer token for `POST /games/v1/maintenance/sweep`. Empty disables the endpoint. Set it if you schedule the sweep. |
-| `PLAYROOM_ROOM_TTL_HOURS`   | No       | `2`                              | Hours a room stays reachable after its last change. The client's copy says two hours — change both together. |
+| `PLAYROOM_ROOM_TTL_HOURS`   | No       | `2`                              | Hours a room stays reachable after its last change. The client's copy says two hours: change both together. |
 | `PLAYROOM_RETENTION_DAYS`   | No       | `7`                              | Days before the sweeper drops nicknames, boards and selections. Rows and ids are kept. |
 
 All of the above are read by `app/core/config.py`. The workflows also use a few values that never reach the app:
 
 | Name | Kind | Used by | Purpose |
 | --- | --- | --- | --- |
-| `NEON_API_KEY` | Secret | `ci.yml` | Creates and deletes the per-pull-request Neon branch. Optional — the job skips without it. |
+| `NEON_API_KEY` | Secret | `ci.yml` | Creates and deletes the per-pull-request Neon branch. Optional: the job skips without it. |
 | `NEON_PROJECT_ID` | Variable | `ci.yml` | The Neon project to branch from. Its presence is what enables the job. |
 | `NEON_PRODUCTION_BRANCH` | Variable | `ci.yml` | Parent branch to clone. Defaults to `production`. |
-| `DATABASE_URL_UNPOOLED` | Secret | `deploy.yml` | Neon's **direct** endpoint (hostname without `-pooler`), used only to run migrations. Optional — falls back to `DATABASE_URL`. |
+| `DATABASE_URL_UNPOOLED` | Secret | `deploy.yml` | Neon's **direct** endpoint (hostname without `-pooler`), used only to run migrations. Optional: falls back to `DATABASE_URL`. |
 
 ## Latency: put the app and the database in the same geography
 
@@ -53,7 +53,7 @@ This is measurable, not theoretical. A single Playroom move runs about a dozen
 sequential queries, so every millisecond between the app and the database is
 paid a dozen times.
 
-Measured against a Neon project in `us-east-2` from a client in India — roughly
+Measured against a Neon project in `us-east-2` from a client in India, roughly
 the worst placement possible, and **not** how this is deployed:
 
 | Request | Time |
@@ -76,10 +76,10 @@ unchanged room should not cost a full read.
 
 Neon gives two connection strings for the same database. Use the right one:
 
-- **Pooled** (hostname contains `-pooler`) — `DATABASE_URL`, the application's
+- **Pooled** (hostname contains `-pooler`): `DATABASE_URL`, the application's
   normal traffic. Cloud Run opens a connection per instance and this is what
   keeps the total inside Neon's limit.
-- **Direct** (no `-pooler`) — `DATABASE_URL_UNPOOLED`, for migrations, dumps and
+- **Direct** (no `-pooler`): `DATABASE_URL_UNPOOLED`, for migrations, dumps and
   `LISTEN`/`NOTIFY`.
 
 The pooled endpoint is PgBouncer in transaction mode and does not keep session
@@ -90,7 +90,7 @@ Both strings need the same two edits before this app can use them: change the
 scheme to `postgresql+asyncpg://` and remove the query parameters. See the
 `asyncpg` trap in `CLAUDE.md`.
 
-These are **not** `Settings` fields and must not be added to `app/core/config.py` — the app never reads them.
+These are **not** `Settings` fields and must not be added to `app/core/config.py`. The app never reads them.
 
 ---
 
@@ -129,7 +129,7 @@ echo -n "the-secret-value" | gcloud secrets create SECRET_KEY --data-file=-
 gcloud secrets add-iam-policy-binding SECRET_KEY \
   --member "serviceAccount:YOUR_RUNTIME_SA" --role roles/secretmanager.secretAccessor
 
-# Reference it at deploy — the value is not stored in the revision
+# Reference it at deploy: the value is not stored in the revision
 gcloud run deploy anuvia --set-secrets "SECRET_KEY=SECRET_KEY:latest" ...
 ```
 
@@ -137,14 +137,14 @@ With `--set-secrets`, the revision holds a reference, not the value, and access 
 
 ---
 
-## Adding a variable — four places, one pull request
+## Adding a variable: four places, one pull request
 
 Missing any step breaks somebody.
 
-1. **`.env.example`** — add it with a comment: purpose, valid values, default, whether production requires it.
-2. **`app/core/config.py`** — add the typed field to `Settings`. Give it a safe default, or no default if it must be present.
-3. **`deploy.yml`** — add a `--set-env-vars` line, or a `--set-secrets` reference if it is a secret. Add the matching GitHub variable or secret.
-4. **This file** — add a row to the table above, and a note in the secrets section if it is sensitive.
+1. **`.env.example`**: add it with a comment: purpose, valid values, default, whether production requires it.
+2. **`app/core/config.py`**: add the typed field to `Settings`. Give it a safe default, or no default if it must be present.
+3. **`deploy.yml`**: add a `--set-env-vars` line, or a `--set-secrets` reference if it is a secret. Add the matching GitHub variable or secret.
+4. **This file**: add a row to the table above, and a note in the secrets section if it is sensitive.
 
 Then add the value where it runs: `.env` locally, and the GitHub variable or secret for production. Tests and CI use dummy values, so add it to `tests/conftest.py` or `ci.yml` only if the code path under test reads it.
 

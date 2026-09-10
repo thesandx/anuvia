@@ -5,33 +5,33 @@ on:
     branches: [main]
 
 # GitHub Variables (Settings → Secrets and variables → Variables):
-#   GCP_PROJECT_ID       — your Google Cloud project ID
-#   GCP_REGION           — e.g. us-central1
-#   CLOUD_RUN_SERVICE    — e.g. anuvia
-#   APP_NAME             — e.g. anuvia
-#   ARTIFACT_REPOSITORY  — Artifact Registry repo name, e.g. containers
-#   CORS_ALLOW_ORIGINS   — browser origins allowed to call the API, comma-
+#   GCP_PROJECT_ID, your Google Cloud project ID
+#   GCP_REGION, e.g. us-central1
+#   CLOUD_RUN_SERVICE: e.g. anuvia
+#   APP_NAME: e.g. anuvia
+#   ARTIFACT_REPOSITORY: Artifact Registry repo name, e.g. containers
+#   CORS_ALLOW_ORIGINS, browser origins allowed to call the API, comma-
 #                          separated. Defaults to "*". Set it to the real
 #                          frontend origins before you ship.
 #
 # GitHub Secrets (Settings → Secrets and variables → Secrets):
-#   WIF_PROVIDER         — Workload Identity provider resource name
+#   WIF_PROVIDER, Workload Identity provider resource name
 #                          (projects/NUMBER/locations/global/workloadIdentityPools/POOL/providers/PROVIDER)
-#   WIF_SERVICE_ACCOUNT  — deployer SA email (github-deployer@PROJECT.iam.gserviceaccount.com)
-#   SECRET_KEY           — JWT signing secret (min 32 chars)
-#   DATABASE_URL         — postgresql+asyncpg://user:password@ep-xxx.neon.tech/neondb
+#   WIF_SERVICE_ACCOUNT, deployer SA email (github-deployer@PROJECT.iam.gserviceaccount.com)
+#   SECRET_KEY, JWT signing secret (min 32 chars)
+#   DATABASE_URL, postgresql+asyncpg://user:password@ep-xxx.neon.tech/neondb
 #                          Use Neon's POOLED endpoint (hostname contains -pooler)
 #                          for the application: it is a connection-per-request
 #                          workload and PgBouncer is what keeps it inside Neon's
 #                          connection limit.
-#   DATABASE_URL_UNPOOLED — the same database on Neon's DIRECT endpoint (no
+#   DATABASE_URL_UNPOOLED, the same database on Neon's DIRECT endpoint (no
 #                          -pooler). Used only by the migration step below.
 #                          Optional: it falls back to DATABASE_URL.
-#   PLAYROOM_MAINTENANCE_TOKEN — bearer token the rooms retention sweeper needs
-#   STRIPE_SECRET_KEY    — (optional)
-#   STRIPE_WEBHOOK_SECRET — (optional)
+#   PLAYROOM_MAINTENANCE_TOKEN, bearer token the rooms retention sweeper needs
+#   STRIPE_SECRET_KEY, (optional)
+#   STRIPE_WEBHOOK_SECRET, (optional)
 #
-# Authentication is keyless via Workload Identity Federation — there is no
+# Authentication is keyless via Workload Identity Federation, there is no
 # service account key. See cloud/github-actions.md for the one-time GCP setup.
 # The image is pushed to Artifact Registry (not the deprecated gcr.io).
 
@@ -75,7 +75,7 @@ jobs:
           docker push $IMAGE:${{ github.sha }}
           docker push $IMAGE:latest
 
-      # Migrations run ONCE, here, against the production database — not in the
+      # Migrations run ONCE, here, against the production database, not in the
       # container CMD. On boot every Cloud Run instance would run them and race
       # on the same locks, and a bad migration would stop every instance from
       # starting (a full outage) rather than failing this step (a failed deploy).

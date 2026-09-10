@@ -7,7 +7,7 @@ WebSocket infrastructure, survives proxies, and reconnects on its own.
 
 **The limit, stated plainly:** this broker is per process. A change made on
 instance A does not wake a listener on instance B. That is the third option the
-handover lists — a single worker fanning out in process — and it is why the
+handover lists, a single worker fanning out in process, and it is why the
 2-second poll in `hooks/useRoom.ts` stays as the fallback. A client that misses
 a push is at most two seconds stale, never wrong.
 
@@ -26,7 +26,7 @@ from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
-#: Bounded so a listener that stops reading — a laptop that slept mid-round —
+#: Bounded so a listener that stops reading, a laptop that slept mid-round,
 #: cannot grow a queue without limit. The oldest frame is dropped, and the next
 #: change or the client's own poll brings the listener back to current.
 QUEUE_LIMIT = 16

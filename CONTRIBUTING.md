@@ -1,6 +1,6 @@
 # Contributing
 
-How to make a change to anuvia. This is the human quickstart. The full rulebook is in [`CLAUDE.md`](./CLAUDE.md) and [`.github/instructions/`](./.github/instructions/) — read those before a non-trivial change.
+How to make a change to anuvia. This is the human quickstart. The full rulebook is in [`CLAUDE.md`](./CLAUDE.md) and [`.github/instructions/`](./.github/instructions/): read those before a non-trivial change.
 
 ---
 
@@ -21,7 +21,7 @@ Full detail: [`docs/local-development.md`](./docs/local-development.md).
 
 ## The workflow
 
-1. **Branch.** Never commit to `main` — a push to `main` deploys to production.
+1. **Branch.** Never commit to `main`: a push to `main` deploys to production.
    ```bash
    git checkout -b feat/my-change
    ```
@@ -83,4 +83,4 @@ Four places, one pull request: `.env.example`, `app/core/config.py`, `deploy.yml
 
 ## Before you ask "why is it done this way?"
 
-Check [`CLAUDE.md`](./CLAUDE.md) — especially the "Traps" section — and [`docs/adr/`](./docs/adr/). Several things that look wrong are correct and are documented there.
+Check [`CLAUDE.md`](./CLAUDE.md), especially the "Traps" section, and [`docs/adr/`](./docs/adr/). Several things that look wrong are correct and are documented there.

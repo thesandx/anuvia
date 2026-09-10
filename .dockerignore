@@ -4,7 +4,7 @@
 .env.*.local
 .env.docker
 
-# No need to copy — pip installs these inside the image
+# No need to copy, pip installs these inside the image
 .venv/
 venv/
 env/

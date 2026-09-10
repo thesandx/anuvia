@@ -8,7 +8,7 @@ How to set up, run, and work on anuvia on your own machine.
 
 - Python 3.12.
 - `git`.
-- Docker (only for the production-like local run — not for day-to-day coding).
+- Docker (only for the production-like local run, not for day-to-day coding).
 
 You do **not** need PostgreSQL, Neon, or any cloud account to develop locally. Local development runs on SQLite with no setup.
 
@@ -117,9 +117,9 @@ alembic upgrade head
 | --- | --- | --- |
 | Command | `uvicorn app.main:app --reload` | `docker run --env-file .env.docker -p 8080:8080 anuvia` |
 | Database | SQLite (`local.db`) | Neon PostgreSQL |
-| Hot reload | Yes | No — rebuild after changes |
+| Hot reload | Yes | No, rebuild after changes |
 | `/docs` | Enabled | Enabled (if `APP_ENV=development`) |
-| Matches Cloud Run | No | Yes — same image, same database |
+| Matches Cloud Run | No | Yes, same image, same database |
 | Use for | Day-to-day coding | Reproducing a production issue |
 
 ### The production-like Docker run
@@ -134,7 +134,7 @@ docker run --rm --env-file .env.docker anuvia alembic upgrade head
 docker run --env-file .env.docker -p 8080:8080 anuvia
 ```
 
-Two commands, because that is the exact sequence the deploy runs: migrate once, then serve. The container `CMD` does not migrate — `deploy.yml` does, before the new revision goes live. Skip the first command against a fresh database and every route that touches a table returns 500. Every request and every SQL query prints to the terminal when `DEBUG=true`.
+Two commands, because that is the exact sequence the deploy runs: migrate once, then serve. The container `CMD` does not migrate. `deploy.yml` does, before the new revision goes live. Skip the first command against a fresh database and every route that touches a table returns 500. Every request and every SQL query prints to the terminal when `DEBUG=true`.
 
 ---
 
@@ -142,14 +142,14 @@ Two commands, because that is the exact sequence the deploy runs: migrate once, 
 
 Every variable is read by `app/core/config.py`. The full reference is in the README and in [`cloud/environment-variables.md`](../cloud/environment-variables.md). The two you must set:
 
-- `SECRET_KEY` — required, no default. Generate it as shown above.
-- `DATABASE_URL` — defaults to SQLite. Change it only for the production-like run.
+- `SECRET_KEY`: required, no default. Generate it as shown above.
+- `DATABASE_URL`: defaults to SQLite. Change it only for the production-like run.
 
 ---
 
 ## Adding a Neon database (only when you need PostgreSQL locally)
 
-You need Neon only to run the production-like Docker path or to test a PostgreSQL-specific change. The full walkthrough — including the connection-string edit that trips everyone up — is in the README "Setting Up Neon" section. The one rule to remember: change `postgresql://` to `postgresql+asyncpg://` and remove the `?sslmode=...` query parameters. See [troubleshooting.md](./troubleshooting.md).
+You need Neon only to run the production-like Docker path or to test a PostgreSQL-specific change. The full walkthrough, including the connection-string edit that trips everyone up, is in the README "Setting Up Neon" section. The one rule to remember: change `postgresql://` to `postgresql+asyncpg://` and remove the `?sslmode=...` query parameters. See [troubleshooting.md](./troubleshooting.md).
 
 ---
 
@@ -157,5 +157,5 @@ You need Neon only to run the production-like Docker path or to test a PostgreSQ
 
 Full symptom-to-fix table is in [troubleshooting.md](./troubleshooting.md). The two most common:
 
-- **`pytest` picks up my real database.** It should not — `tests/conftest.py` forces in-memory SQLite. If it does, something imports the app before `conftest.py` sets the environment. Do not move that line.
+- **`pytest` picks up my real database.** It should not: `tests/conftest.py` forces in-memory SQLite. If it does, something imports the app before `conftest.py` sets the environment. Do not move that line.
 - **`alembic upgrade head` fails on a fresh clone.** Confirm `.env` exists and `SECRET_KEY` is set. `alembic/env.py` imports `Settings`, which fails without it.

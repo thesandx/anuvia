@@ -551,7 +551,7 @@ async def test_five_lines_wins_and_scores_the_room(client):
     """A win is five lines, and it does not need a full board.
 
     The stopping point is not fixed in advance on purpose. Lines share cells, so
-    the fifth one can arrive on a pick that also completes a fourth — the count
+    the fifth one can arrive on a pick that also completes a fourth. The count
     is what decides, never the number of picks.
     """
     created = await create_room(client)
@@ -637,7 +637,7 @@ async def test_a_second_claim_gets_round_over(client):
 
 async def test_a_board_that_runs_out_ends_the_round_for_the_closer(client):
     """All 25 gone with nobody claiming. Every board then holds all twelve
-    lines, so 'most lines' is a twelve-way tie — the closer takes it."""
+    lines, so 'most lines' is a twelve-way tie. The closer takes it."""
     created = await create_room(client)
     key, token = created["room"]["key"], created["playerToken"]
     await client.post(f"{BASE}/rooms/{key}/rounds", headers=auth(token))

@@ -2,8 +2,8 @@
 
 Board visibility is enforced here and nowhere else. A player sees their own
 board only; the winner's board becomes visible to the room when the round ends,
-and not before. Hiding the other grids in the UI would be theatre — the payload
-is one dev-tools tab away — so the narrowing happens on the way out of every
+and not before. Hiding the other grids in the UI would be theatre, the payload
+is one dev-tools tab away, so the narrowing happens on the way out of every
 handler, including the read.
 
 This is the Python counterpart of `scopeRoomForPlayer` in the client's

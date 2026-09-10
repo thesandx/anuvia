@@ -5,7 +5,7 @@ name: CodeQL
 # changed. Results land in the repository Security tab.
 #
 # CodeQL is free on PUBLIC repositories. anuvia is public, so this works as-is.
-# On a PRIVATE repository it needs GitHub Advanced Security — without it the
+# On a PRIVATE repository it needs GitHub Advanced Security, without it the
 # analysis runs, then fails at upload with "Code scanning is not enabled for
 # this repository". If you make this repository private and do not have GHAS,
 # delete this file rather than leave a permanently red check.

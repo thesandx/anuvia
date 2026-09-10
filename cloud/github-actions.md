@@ -1,6 +1,6 @@
 # GitHub Actions and the deploy credential
 
-How the pipeline authenticates to Google Cloud — keyless, with no stored credential.
+How the pipeline authenticates to Google Cloud: keyless, with no stored credential.
 
 For the rules an assistant follows when editing a workflow, see [`.github/instructions/github-workflows.md`](../.github/instructions/github-workflows.md).
 
@@ -25,7 +25,7 @@ steps:
 
 GitHub presents a token that proves "this run is from `thesandx/anuvia`". Google exchanges it for temporary credentials scoped to the deployer service account. The token expires in minutes and cannot be reused elsewhere.
 
-> **History:** the pipeline used a `GCP_SA_KEY` secret before. A key is a long-lived bearer credential — valid until revoked if it leaks. It has been removed in favour of federation. Do not reintroduce a key.
+> **History:** the pipeline used a `GCP_SA_KEY` secret before. A key is a long-lived bearer credential: valid until revoked if it leaks. It has been removed in favour of federation. Do not reintroduce a key.
 
 The deployer service account keeps only the roles it needs: `roles/run.admin`, `roles/artifactregistry.writer`, and `roles/iam.serviceAccountUser`.
 
@@ -69,7 +69,7 @@ The `attribute-condition` is the security boundary. It binds the credential to *
 
 > Neither value is truly sensitive, so plain variables would also work. This repository keeps them as **secrets** to match the `nextjs-cloudrun-template`. If you switch them to variables, change `deploy.yml` to read `${{ vars.WIF_* }}`.
 
-The job also declares `permissions: id-token: write`, which lets GitHub mint the OIDC token. That permission is on the deploy job only — keep it off every other job.
+The job also declares `permissions: id-token: write`, which lets GitHub mint the OIDC token. That permission is on the deploy job only: keep it off every other job.
 
 Once a deploy succeeds with federation, delete the old `GCP_SA_KEY` secret and delete the service account key (`gcloud iam service-accounts keys delete`). No key should remain.
 
@@ -91,7 +91,7 @@ The `attribute-condition` does not match, or the `workloadIdentityUser` binding 
 
 ### `id-token` not available
 
-The job is missing `permissions: id-token: write`. Add it to the job, not just the workflow. Keep it off every other job — only the deploy needs it.
+The job is missing `permissions: id-token: write`. Add it to the job, not just the workflow. Keep it off every other job, only the deploy needs it.
 
 ### The deploy authenticates but cannot push the image or deploy
 

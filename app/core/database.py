@@ -19,7 +19,7 @@ def enforce_sqlite_foreign_keys(target) -> None:
     """Makes SQLite check foreign keys, which it does not do by default.
 
     Production is PostgreSQL, which always enforces them. Without this, a
-    foreign-key bug — a row written before the row it points at, say — passes
+    foreign-key bug, a row written before the row it points at, say, passes
     every local test and fails on the first real deploy. Turning it on is what
     makes the local database tell the truth.
 

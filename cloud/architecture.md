@@ -46,7 +46,7 @@ The target architecture for anuvia on Google Cloud, the service boundaries, and 
 ## Service boundaries
 
 - **Cloud Run is stateless.** It stores nothing between requests. Every piece of state lives in Neon. This is what lets it scale to zero and run many instances safely.
-- **The database is external and regional.** It is the one stateful component. Its region choice drives the app's latency — see [multi-region.md](./multi-region.md).
+- **The database is external and regional.** It is the one stateful component. Its region choice drives the app's latency: see [multi-region.md](./multi-region.md).
 - **Secrets are runtime, not build-time.** The image contains no credential. Configuration arrives from the environment at deploy. A rebuild is never needed to change a secret.
 
 ---
@@ -67,14 +67,14 @@ logs → stdout → Cloud Logging
 
 - **Horizontal, automatic.** Cloud Run adds instances under load and removes them when idle, down to zero.
 - **Concurrency per instance.** One instance handles many concurrent requests. The app is safe under this because it is stateless and each request gets its own database session. Do not add process-global mutable state.
-- **The database is the scaling ceiling.** Cloud Run scales faster than a single database primary. Neon's connection pooler (PgBouncer) absorbs the connection churn. If instance count grows large, use Neon's pooled endpoint and consider read replicas for read-heavy paths — the same mechanism as [multi-region.md](./multi-region.md) step 3, applied for scale rather than geography.
+- **The database is the scaling ceiling.** Cloud Run scales faster than a single database primary. Neon's connection pooler (PgBouncer) absorbs the connection churn. If instance count grows large, use Neon's pooled endpoint and consider read replicas for read-heavy paths: the same mechanism as [multi-region.md](./multi-region.md) step 3, applied for scale rather than geography.
 - **Instances are capped at 3** (`--max-instances 3` in `deploy.yml`). The cap exists because each instance opens its own SQLAlchemy connection pool, so uncapped autoscaling reaches Neon's connection ceiling before it reaches a CPU limit. Raise it and the pooled Neon endpoint together, not separately.
 
 ---
 
 ## Cold starts
 
-With min-instances 0, the first request after idle pays a cold start: the container boots, and Neon (also scaled to zero) wakes. This is acceptable for most low-traffic products. Where it is not, set `--min-instances=1` to keep one instance warm, at ~$10–15/month.
+With min-instances 0, the first request after idle pays a cold start: the container boots, and Neon (also scaled to zero) wakes. This is acceptable for most low-traffic products. Where it is not, set `--min-instances=1` to keep one instance warm, at ~$10-15/month.
 
 ---
 

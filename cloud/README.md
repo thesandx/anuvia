@@ -10,7 +10,7 @@ Everything about running anuvia on Google Cloud: the architecture, the deploymen
 | [deployment.md](./deployment.md)                       | The operator runbook: one-time setup, deploying, verifying, rollback |
 | [environment-variables.md](./environment-variables.md) | Runtime configuration, secrets, and how to add a variable            |
 | [github-actions.md](./github-actions.md)               | The deploy credential today, and the keyless hardening path          |
-| [multi-region.md](./multi-region.md)                   | Regions, replicas, latency, and cost — the answer to "go multi-region?" |
+| [multi-region.md](./multi-region.md)                   | Regions, replicas, latency, and cost. The answer to "go multi-region?" |
 
 ## The stack in one paragraph
 
@@ -22,7 +22,7 @@ GitHub Actions builds the FastAPI app into a small Python container. It pushes t
 | --------------------- | ------------------------------------------ | -------------------------------------------------------- |
 | **Cloud Run**         | Runs the container, autoscales, ends TLS    | Serverless containers, scale-to-zero, per-request billing |
 | **Artifact Registry** | Stores the image                            | The modern registry (successor to `gcr.io`), regional, IAM-integrated |
-| **Cloud Logging**     | Log aggregation and search                  | Automatic — Cloud Run forwards stdout/stderr            |
+| **Cloud Logging**     | Log aggregation and search                  | Automatic. Cloud Run forwards stdout/stderr            |
 | **Secret Manager**    | Secret storage (hardening target)           | Versioned, IAM-controlled; mounted into Cloud Run        |
 | **IAM**               | Deploy identity                             | Grants the pipeline permission to push and deploy        |
 
@@ -48,8 +48,8 @@ Indicative for a low-traffic service:
 | Setup                                             | Approximate monthly cost      |
 | ------------------------------------------------- | ----------------------------- |
 | Cloud Run under the free tier + Neon free tier     | $0                            |
-| Cloud Run `--min-instances=1` (no cold starts)     | ~$10–15 for the warm instance |
-| Cloud SQL smallest instance (if you leave Neon)    | ~$8–10, always on             |
+| Cloud Run `--min-instances=1` (no cold starts)     | ~$10-15 for the warm instance |
+| Cloud SQL smallest instance (if you leave Neon)    | ~$8-10, always on             |
 | Multi-region: global load balancer base            | ~$18+, before traffic         |
 
 Set a budget alert before the first deploy. Multi-region cost is the subject of [multi-region.md](./multi-region.md).

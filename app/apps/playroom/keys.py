@@ -29,7 +29,7 @@ def create_room_key() -> str:
     """A six-character room key, e.g. `PLZ4K9`.
 
     About 1.07 billion combinations. The caller inserts and retries on a unique
-    violation rather than pre-checking for existence — the unique index is the
+    violation rather than pre-checking for existence. The unique index is the
     check, and a pre-check is a race.
     """
     return "".join(secrets.choice(ROOM_KEY_ALPHABET) for _ in range(ROOM_KEY_LENGTH))

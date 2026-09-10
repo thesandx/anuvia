@@ -10,7 +10,7 @@ This document decides where a new file goes. Read it before you create one.
 anuvia/
 ├── app/
 │   ├── main.py                 # FastAPI app. CORS, lifespan, /health. Never add routes here.
-│   ├── core/                   # Foundation — imported by everything, imports nothing above it
+│   ├── core/                   # Foundation, imported by everything, imports nothing above it
 │   │   ├── config.py           # Settings (pydantic-settings). The only reader of the environment.
 │   │   ├── database.py         # Async engine, SessionLocal, Base, get_db dependency.
 │   │   ├── security.py         # bcrypt hashing, JWT create/decode.
@@ -71,7 +71,7 @@ anuvia/
 
 ## The four files of an app
 
-Every folder in `app/apps/` has the same shape. Keep it, even when a file is nearly empty — a consistent shape is what makes the codebase navigable.
+Every folder in `app/apps/` has the same shape. Keep it, even when a file is nearly empty. A consistent shape is what makes the codebase navigable.
 
 | File         | Holds                                                                 |
 | ------------ | -------------------------------------------------------------------- |
@@ -80,7 +80,7 @@ Every folder in `app/apps/` has the same shape. Keep it, even when a file is nea
 | `models.py`  | The SQLAlchemy tables for this app. Empty with a note if it has none. |
 | `schemas.py` | The Pydantic request and response models.                            |
 
-`auth/models.py` is the example of an intentionally empty models file — auth reuses the shared `User`. It keeps a comment that says so.
+`auth/models.py` is the example of an intentionally empty models file: auth reuses the shared `User`. It keeps a comment that says so.
 
 ---
 
@@ -100,7 +100,7 @@ When a product-local query grows complex or gets reused within the app, extract 
 - Modules: `snake_case.py`.
 - Classes: `PascalCase` (`AuthService`, `UserRepository`, `ChatSession`).
 - Functions and variables: `snake_case`.
-- App folders: `snake_case` — the folder name becomes the default URL prefix and tag.
+- App folders: `snake_case`. The folder name becomes the default URL prefix and tag.
 - Tests: `test_<subject>.py`, functions `test_<behaviour>`.
 
 ---
@@ -115,7 +115,7 @@ from app.core.config import settings
 from app.core.dependencies import get_current_user
 from app.models.user import User
 
-# No — relative walk-ups
+# No: relative walk-ups
 from ...core.config import settings
 ```
 
