@@ -34,7 +34,11 @@ The stack is async end to end: FastAPI, SQLAlchemy 2.0 async, Alembic, Pydantic 
 
 The purpose is that **the path to production already works**: a container that runs on Cloud Run, a pipeline that deploys it, and documentation that explains each decision. Adding a product must not degrade that path. Keep the reusable base clean.
 
-If the repository still contains only `auth`, `payments`, and `ai_chat` with the echo stub in `ai_chat/service.py`, it is not customised yet.
+The apps today are `auth`, `payments`, `ai_chat` (still the echo stub) and
+**`playroom`** — the rooms API behind the Playroom party-games frontend. Its
+full contract is `docs/backend-handover.md` in the `games` repository; read that
+before you change any payload shape, because the Next.js client reads the
+`Room` object by field name and a rename is a breaking change.
 
 ---
 
@@ -87,6 +91,7 @@ This file is the index and the warnings. The detail lives in `.github/instructio
 | [`cloud/multi-region.md`](./cloud/multi-region.md)                           | Thinking about regions, replicas, or global latency.         |
 | [`cloud/environment-variables.md`](./cloud/environment-variables.md)         | Adding or changing configuration.                             |
 | [`SECURITY.md`](./SECURITY.md)                                               | The security model and the pre-production hardening checklist.|
+| `app/apps/playroom/` module docstrings                                       | Working on the rooms API. Each file says what it owns and why.|
 
 **Precedence when guidance conflicts** (later wins): your training defaults → general FastAPI/GCP docs → `.github/instructions/` → this file → an explicit instruction from the human you work with.
 
@@ -267,7 +272,36 @@ Two consequences you own in exchange:
 
 ### Trap 9
 
-**CORS is wide open (`allow_origins=["*"]`), which is fine for local and wrong for production.** `main.py` allows every origin with credentials. Browsers reject `*` combined with credentials, and it is not a safe production setting. Restrict `allow_origins` to your real frontend domain before you ship. This is on the [hardening checklist](./SECURITY.md).
+**CORS defaults to `allow_origins=["*"]`, which is fine locally and wrong in
+production.** It is now a setting, `CORS_ALLOW_ORIGINS`, so closing it is
+configuration rather than a code change. Set it to the real frontend origins
+before you ship. This is on the [hardening checklist](./SECURITY.md).
+
+`expose_headers=["ETag"]` in the same middleware is **load-bearing, not
+decoration**. A browser cannot read *any* response header on a cross-origin
+request unless the server names it here. Remove it and
+`response.headers.get('ETag')` returns `null` in the browser, the rooms client
+stops sending `If-None-Match`, and every two-second poll silently downloads a
+full room again. Nothing errors; it just gets slower.
+
+### Trap 10
+
+**`router_loader` skips an app whose `router.py` fails to import, and says
+nothing.** It catches `ModuleNotFoundError` to skip a folder that has no
+`router.py`, and the same handler swallows a genuinely broken import *inside* a
+router — a typo in a module name takes the whole product off the API while the
+container still starts and `/health` still passes. If a route 404s that you
+believe you registered, check `GET /openapi.json` first: an absent path means
+the module did not import, not that the path is wrong.
+
+### Trap 11
+
+**SQLite does not enforce foreign keys unless asked, so `app/core/database.py`
+asks.** `enforce_sqlite_foreign_keys` sets `PRAGMA foreign_keys=ON` on every
+SQLite connection, and `tests/conftest.py` calls it on the test engine too.
+Without it a row written before the row it points at passes every local test and
+fails on the first real deploy — which is exactly what happened once. Do not
+remove it to make a test pass; the test is telling the truth.
 
 ---
 

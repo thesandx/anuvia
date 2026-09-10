@@ -33,6 +33,10 @@ No secret is ever in the repository. `.env`, `.env.docker`, and `*.db` are git-i
 | `STRIPE_SECRET_KEY`         | No       | `""`                             | Stripe integration.                       |
 | `STRIPE_WEBHOOK_SECRET`     | No       | `""`                             | Stripe webhook signature check.           |
 | `DEPLOYED_AT`               | No       | `""`                             | UTC deploy time (ISO-8601), set by the workflow. `/health` renders it in IST. |
+| `CORS_ALLOW_ORIGINS`        | No       | `*`                              | Browser origins allowed to call the API. Comma-separated. `*` is for local development only. |
+| `PLAYROOM_MAINTENANCE_TOKEN` | No      | `""`                             | Bearer token for `POST /games/v1/maintenance/sweep`. Empty disables the endpoint. Set it if you schedule the sweep. |
+| `PLAYROOM_ROOM_TTL_HOURS`   | No       | `2`                              | Hours a room stays reachable after its last change. The client's copy says two hours — change both together. |
+| `PLAYROOM_RETENTION_DAYS`   | No       | `7`                              | Days before the sweeper drops nicknames, boards and selections. Rows and ids are kept. |
 
 All of the above are read by `app/core/config.py`. The workflows also use a few values that never reach the app:
 
@@ -41,6 +45,50 @@ All of the above are read by `app/core/config.py`. The workflows also use a few 
 | `NEON_API_KEY` | Secret | `ci.yml` | Creates and deletes the per-pull-request Neon branch. Optional — the job skips without it. |
 | `NEON_PROJECT_ID` | Variable | `ci.yml` | The Neon project to branch from. Its presence is what enables the job. |
 | `NEON_PRODUCTION_BRANCH` | Variable | `ci.yml` | Parent branch to clone. Defaults to `production`. |
+| `DATABASE_URL_UNPOOLED` | Secret | `deploy.yml` | Neon's **direct** endpoint (hostname without `-pooler`), used only to run migrations. Optional — falls back to `DATABASE_URL`. |
+
+## Latency: put the app and the database in the same geography
+
+This is measurable, not theoretical. A single Playroom move runs about a dozen
+sequential queries, so every millisecond between the app and the database is
+paid a dozen times.
+
+Measured against a Neon project in `us-east-2` from a client in India — roughly
+the worst placement possible, and **not** how this is deployed:
+
+| Request | Time |
+| --- | --- |
+| One in-game move | ~4.0 s |
+| A room read | ~2.7 s |
+| A room read that answers `304` | ~1.2 s |
+
+The client gives up after eight seconds, so that placement is close to unusable
+even though nothing is wrong with the code. Co-locate Cloud Run and Neon and the
+same requests cost tens of milliseconds. See
+[ADR-0003](../docs/adr/0003-single-region-now-multi-region-later.md) and
+[`multi-region.md`](./multi-region.md).
+
+The `304` row is also why `GET /games/v1/rooms/{key}` supports `If-None-Match`:
+every player polls every two seconds whether or not anything changed, and an
+unchanged room should not cost a full read.
+
+## Pooled and direct connections
+
+Neon gives two connection strings for the same database. Use the right one:
+
+- **Pooled** (hostname contains `-pooler`) — `DATABASE_URL`, the application's
+  normal traffic. Cloud Run opens a connection per instance and this is what
+  keeps the total inside Neon's limit.
+- **Direct** (no `-pooler`) — `DATABASE_URL_UNPOOLED`, for migrations, dumps and
+  `LISTEN`/`NOTIFY`.
+
+The pooled endpoint is PgBouncer in transaction mode and does not keep session
+state. A migration run over it fails in ways that never mention pooling, so the
+deploy workflow uses the direct endpoint for that one step.
+
+Both strings need the same two edits before this app can use them: change the
+scheme to `postgresql+asyncpg://` and remove the query parameters. See the
+`asyncpg` trap in `CLAUDE.md`.
 
 These are **not** `Settings` fields and must not be added to `app/core/config.py` — the app never reads them.
 

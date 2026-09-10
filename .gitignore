@@ -39,3 +39,4 @@ coverage.xml
 .idea/
 .vscode/
 *.swp
+.neon
